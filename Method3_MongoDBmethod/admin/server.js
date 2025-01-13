@@ -1,75 +1,24 @@
 const express = require('express');
 const WebSocket = require('ws');
-const http = require('http'); // Added http module
+const http = require('http');
 const bodyParser = require('body-parser');
 const os = require('os');
 const { MongoClient, ServerApiVersion } = require('mongodb');
 require('dotenv').config({ path: "../.env" });
 
 const app = express();
-const port = 3000; // Port for the Express server
-const wsPort = 8080; // Port for the WebSocket server
+const port = 3000; // Single port for both HTTP and WebSocket
 
 const uri = process.env.MONGODB_URI;
-
 let client;
 let db;
-// let webSocketServer;
 
-// Create an HTTP server
 const server = http.createServer(app);
+const wss = new WebSocket.Server({ server }); // Bind WebSocket to HTTP server
 
-// Create a WebSocket server
-const wss = new WebSocket.Server({ server });
-
-// Handle WebSocket connections
-
-function toIST(date) {
-    // // Convert UTC date to IST (UTC+5:30)
-    const istOffset = 5 * 60 + 30; // IST is UTC+5:30
-    return new Date(new Date(date).getTime() + istOffset * 60 * 1000);
-    // return date;
-}
-
-async function getIPAddress() {
-    const interfaces = os.networkInterfaces();
-    for (const name of Object.keys(interfaces)) {
-      for (const iface of interfaces[name]) {
-        // Skip over internal (i.e. 127.0.0.1) and non-IPv4 addresses
-        if (iface.family === 'IPv4' && !iface.internal) {
-          return iface.address;
-        }
-      }
-    }
-    return '0.0.0.0';
-  }
-
-async function connectToMongoDB() {
-    if (!client) {
-        console.log("Connecting to MongoDB...");
-        client = new MongoClient(uri, {
-            serverApi: {
-                version: ServerApiVersion.v1,
-                strict: true,
-                deprecationErrors: true,
-            }
-        });
-
-        try {
-            await client.connect();
-            db = client.db("ResponseLogging");
-            console.log("Connected to MongoDB");
-
-            // Ensure indexes for faster lookups
-            await db.collection('Tables').createIndex({ tableID: 1 });
-            await db.collection('Schedule').createIndex({ labNo: 1, startTime: 1, endTime: 1 });
-
-        } catch (error) {
-            console.error("Error connecting to MongoDB", error);
-            throw error;
-        }
-    }
-}
+// Middleware
+app.use(bodyParser.json());
+app.use(express.static('public'));
 
 async function getLabID(tableID) {
     try {
@@ -169,110 +118,132 @@ async function emptyCollection(collectionName) {
         console.error(`Error emptying the ${collectionName} collection`, error);
     }
 }
-// Middleware
-app.use(bodyParser.json());
-app.use(express.static('public')); // Serve static files from the "public" directory
 
-// Endpoint to get current records from "Schedule"
+function toIST(date) {
+    // // Convert UTC date to IST (UTC+5:30)
+    const istOffset = 5 * 60 + 30; // IST is UTC+5:30
+    return new Date(new Date(date).getTime() + istOffset * 60 * 1000);
+    // return date;
+}
+
+async function getIPAddress() {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+      for (const iface of interfaces[name]) {
+        // Skip over internal (i.e. 127.0.0.1) and non-IPv4 addresses
+        if (iface.family === 'IPv4' && !iface.internal) {
+          return iface.address;
+        }
+      }
+    }
+    return '0.0.0.0';
+  }
+
+// MongoDB Connection
+async function connectToMongoDB() {
+    if (!client) {
+        console.log("Connecting to MongoDB...");
+        client = new MongoClient(uri, {
+            serverApi: {
+                version: ServerApiVersion.v1,
+                strict: true,
+                deprecationErrors: true,
+            }
+        });
+
+        try {
+            await client.connect();
+            db = client.db("ResponseLogging");
+            console.log("Connected to MongoDB");
+
+            // Ensure indexes for faster lookups
+            await db.collection('Tables').createIndex({ tableID: 1 });
+            await db.collection('Schedule').createIndex({ labNo: 1, startTime: 1, endTime: 1 });
+
+        } catch (error) {
+            console.error("Error connecting to MongoDB", error);
+            throw error;
+        }
+    }
+}
+
+// WebSocket Setup
+const clients = new Set();
+
+wss.on('connection', (ws) => {
+    console.log('WebSocket client connected');
+    clients.add(ws);
+
+    ws.on('message', async (message) => {
+        try {
+            console.log('Received message:', message.toString());
+
+            // Ensure message is a string
+            const messageStr = typeof message === 'string' ? message : message.toString();
+
+            // Split message to extract tableID and value
+            const values = messageStr.split('\t');
+            if (values.length !== 2) {
+                console.error('Expected 2 values, but received:', values);
+                return;
+            }
+
+            const tableID = parseInt(values[0].trim(), 10);
+            const value = parseInt(values[1].trim(), 10);
+
+            if (isNaN(tableID) || isNaN(value)) {
+                console.error('One or more values could not be parsed as integers.');
+                return;
+            }
+
+            const labID = await getLabID(tableID);
+
+            if (value === 2) {
+                await logToHelps(labID, tableID);
+            } else {
+                await logToResponses(labID, tableID, value);
+            }
+
+            // Send a confirmation message back to clients
+            const messageToSend = `tableID: ${tableID}, value: ${value}`;
+            clients.forEach(client => {
+                if (client.readyState === WebSocket.OPEN) {
+                    client.send(messageToSend);
+                } else {
+                    console.log('Skipping client as it is not open');
+                }
+            });
+        } catch (error) {
+            console.error('Error processing message:', error);
+        }
+    });
+
+    ws.on('close', () => {
+        console.log('WebSocket client disconnected');
+        clients.delete(ws);
+    });
+
+    ws.on('error', (error) => {
+        console.error('WebSocket error:', error);
+    });
+});
+
+wss.on('error', (error) => {
+    console.error('WebSocket Server Error:', error);
+});
+
+console.log(`WebSocket server running at ws://localhost:${port}`);
+
+// Example Endpoints
 app.get('/get-records', async (req, res) => {
     try {
-        await connectToMongoDB(); // Ensure connection is established
+        await connectToMongoDB();
         const records = await db.collection('Schedule').find({}).toArray();
         res.json(records);
     } catch (error) {
         res.status(500).send('Error retrieving records');
     }
 });
-
-// Add this function to fetch unique room numbers from the "Schedule" collection
-app.get('/get-room-numbers', async (req, res) => {
-    try {
-        const collection = db.collection('Tables');
-        // Use aggregation to get distinct '_id' values
-        const roomNumbers = await collection.aggregate([
-            { $group: { _id: "$_id" } },  // Group by '_id', which is the same as 'labNo'
-            { $sort: { _id: 1 } }         // Sort by '_id'
-        ]).toArray();
-
-        // Map the result to get an array of room numbers
-        const roomNumbersList = roomNumbers.map(item => item._id);
-        res.json(roomNumbersList);
-    } catch (error) {
-        console.error('Error fetching room numbers:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-
-async function setupWebSocketServer() {
-    const wss = new WebSocket.Server({ port: wsPort });
-    const clients = new Set(); // Using a Set to manage connected clients
-
-    wss.on('connection', (ws) => {
-        console.log('WebSocket client connected');
-        clients.add(ws);
-
-        ws.on('message', async (message) => {
-            try {
-                console.log('Received message:', message.toString());
-
-                // Ensure message is a string
-                const messageStr = typeof message === 'string' ? message : message.toString();
-
-                // Split message to extract tableID and value
-                const values = messageStr.split('\t');
-                if (values.length !== 2) {
-                    console.error('Expected 2 values, but received:', values);
-                    return;
-                }
-
-                const tableID = parseInt(values[0].trim(), 10);
-                const value = parseInt(values[1].trim(), 10);
-
-                if (isNaN(tableID) || isNaN(value)) {
-                    console.error('One or more values could not be parsed as integers.');
-                    return;
-                }
-
-                const labID = await getLabID(tableID);
-
-                if (value === 2) {
-                    await logToHelps(labID, tableID);
-                } else {
-                    await logToResponses(labID, tableID, value);
-                }
-
-                // Send a confirmation message back to clients
-                const messageToSend = `tableID: ${tableID}, value: ${value}`;
-                clients.forEach(client => {
-                    if (client.readyState === WebSocket.OPEN) {
-                        client.send(messageToSend);
-                    } else {
-                        console.log('Skipping client as it is not open');
-                    }
-                });
-            } catch (error) {
-                console.error('Error processing message:', error);
-            }
-        });
-
-        ws.on('close', () => {
-            console.log('WebSocket client disconnected');
-            clients.delete(ws); // Remove client from Set
-        });
-
-        ws.on('error', (error) => {
-            console.error('WebSocket error:', error);
-        });
-    });
-
-    wss.on('error', (error) => {
-        console.error('WebSocket Server Error:', error);
-    });
-
-    console.log(`WebSocket server running at ws://localhost:${wsPort}`);
-}
-
 
 // Endpoint to add a record to "Schedule"
 app.post('/add-schedule', async (req, res) => {
@@ -306,14 +277,32 @@ app.post('/add-schedule', async (req, res) => {
     }
 });
 
+// Add this function to fetch unique room numbers from the "Schedule" collection
+app.get('/get-room-numbers', async (req, res) => {
+    try {
+        const collection = db.collection('Tables');
+        // Use aggregation to get distinct '_id' values
+        const roomNumbers = await collection.aggregate([
+            { $group: { _id: "$_id" } },  // Group by '_id', which is the same as 'labNo'
+            { $sort: { _id: 1 } }         // Sort by '_id'
+        ]).toArray();
 
-app.listen(port, async () => {
-    await connectToMongoDB(); // Ensure connection is established once at startup
-    console.log(`Express server running at http://localhost:${port}`);
+        // Map the result to get an array of room numbers
+        const roomNumbersList = roomNumbers.map(item => item._id);
+        res.json(roomNumbersList);
+    } catch (error) {
+        console.error('Error fetching room numbers:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Start Server
+server.listen(port, async () => {
+    await connectToMongoDB();
+    console.log(`Server running at http://localhost:${port}`);
     // Uncomment if you want to empty collections
     // await emptyCollection("Helps");
     // await emptyCollection("Responses");
     // await emptyCollection("UnresolvedHelps");
-    setupWebSocketServer();
 });
 
