@@ -113,7 +113,8 @@
                     connectBtn.disabled = true;
                     disconnectBtn.disabled = true;
 
-                    ws = new WebSocket('ws://localhost:8080');
+                    // ws = new WebSocket('ws://localhost:8080');
+                    ws = new WebSocket('wss://esp8266-control.onrender.com');
 
                     ws.onopen = function () {
                         status.textContent = 'Connected';

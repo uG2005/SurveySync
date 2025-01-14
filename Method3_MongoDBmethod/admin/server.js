@@ -214,6 +214,13 @@
                     }
                 });
             } catch (error) {
+                clients.forEach(client => {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(error);
+                    } else {
+                        console.log('Skipping client as it is not open');
+                    }
+                });
                 console.error('Error processing message:', error);
             }
         });
