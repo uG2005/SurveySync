@@ -70,14 +70,13 @@
                 tableID: tableID,
                 helpStarted: toIST(new Date())
             };
-            let m;
             try {
                 await helpLoggingCollection.insertOne(helpLoggingDoc);
                 console.log('Inserted new document into Helps');
-                m = 'Inserted new document into Helps';
+                broadcastToClients('Inserted new document into Helps');
             } catch (error) {
                 console.error("Error inserting document into Helps", error);
-                m = "Error inserting document into Helps" + error;
+                broadcastToClients("Error inserting document into Helps" + error);
             }
         } else {
             try {
@@ -86,16 +85,20 @@
                     { $set: { helpEnded: toIST(new Date()) } }
                 );
                 console.log('Updated document in Helps with helpEnded');
-                m = 'Updated document in Helps with helpEnded';
+                broadcastToClients('Updated document in Helps with helpEnded');
             } catch (error) {
                 console.error("Error updating document in Helps", error);
-                m = "Error updating document in Helps" + error;
+                broadcastToClients("Error updating document in Helps" + error);
             }
         }
-        broadcastToClients(m);
     }
 
     async function logToResponses(labID, tableID, value) {
+        if(value != 0 && value!=1){
+            console.log('Value not defined',value);
+            broadcastToClients('Value ' +value+" not defined");
+            return;
+        }
         const responseLoggingCollection = db.collection('Responses');
         let nowDate=toIST(new Date());
         const responseLoggingDoc = {
@@ -193,11 +196,12 @@
     wss.on('connection', (ws) => {
         console.log('WebSocket client connected');
         clients.add(ws);
+        broadcastToClients("New Client Added | Total = " + clients.size);
 
         ws.on('message', async (message) => {
             try {
                 console.log('Received message:', message.toString());
-        
+                broadcastToClients('Received message:' + message.toString())
                 // Ensure message is a string
                 const messageStr = typeof message === 'string' ? message : message.toString();
         
@@ -226,10 +230,6 @@
                     await logToResponses(labID, tableID, value);
                 }
         
-                // Broadcast success message to all connected clients
-                const messageToSend = `tableID: ${tableID}, value: ${value}`;
-                broadcastToClients(messageToSend);
-        
             } catch (error) {
                 const errorMessage = `Error processing message: ${error.message || error}`;
                 console.error(errorMessage);
@@ -239,6 +239,7 @@
 
         ws.on('close', () => {
             console.log('WebSocket client disconnected');
+            broadcastToClients("Client Disconnected | Total = " + clients.size);
             clients.delete(ws);
         });
 
@@ -251,7 +252,7 @@
         console.error('WebSocket Server Error:', error);
     });
 
-    console.log(`WebSocket server running at ws://localhost:${port}`);
+    console.log(`WebSocket server running at wss://esp8266-control.onrender.com/`);
 
     // Example Endpoints
     app.get('/get-records', async (req, res) => {
@@ -318,7 +319,7 @@
     // Start Server
     server.listen(port, async () => {
         await connectToMongoDB();
-        console.log(`Server running at http://localhost:${port}`);
+        console.log(`Server running at https://esp8266-control.onrender.com/`);
         // Uncomment if you want to empty collections
         // await emptyCollection("Helps");
         // await emptyCollection("Responses");
