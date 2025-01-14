@@ -70,11 +70,14 @@
                 tableID: tableID,
                 helpStarted: toIST(new Date())
             };
+            const m = '';
             try {
                 await helpLoggingCollection.insertOne(helpLoggingDoc);
                 console.log('Inserted new document into Helps');
+                m = 'Inserted new document into Helps';
             } catch (error) {
                 console.error("Error inserting document into Helps", error);
+                m = "Error inserting document into Helps" + error;
             }
         } else {
             try {
@@ -83,10 +86,13 @@
                     { $set: { helpEnded: toIST(new Date()) } }
                 );
                 console.log('Updated document in Helps with helpEnded');
+                m = 'Updated document in Helps with helpEnded';
             } catch (error) {
                 console.error("Error updating document in Helps", error);
+                m = "Error updating document in Helps" + error;
             }
         }
+        broadcastToClients(m);
     }
 
     async function logToResponses(labID, tableID, value) {
@@ -104,8 +110,10 @@
                 { upsert: true }
             );
             console.log('Updated or inserted document into Responses');
+            broadcastToClients('Updated or inserted document into Responses');
         } catch (error) {
             console.error("Error updating or inserting document into Responses", error);
+            broadcastToClients("Error updating or inserting document into Responses" + error);
         }
     }
 
