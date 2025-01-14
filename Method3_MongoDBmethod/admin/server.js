@@ -70,7 +70,7 @@
                 tableID: tableID,
                 helpStarted: toIST(new Date())
             };
-            const m = '';
+            let m;
             try {
                 await helpLoggingCollection.insertOne(helpLoggingDoc);
                 console.log('Inserted new document into Helps');
