@@ -177,7 +177,19 @@
 
     // WebSocket Setup
     const clients = new Set();
-
+    /**
+             * Broadcasts a message to all connected WebSocket clients.
+             * @param {string} message - The message to send.
+             */
+    function broadcastToClients(message) {
+        clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(message);
+            } else {
+                console.log('Skipping client as it is not open');
+            }
+        });
+    }
     wss.on('connection', (ws) => {
         console.log('WebSocket client connected');
         clients.add(ws);
@@ -224,20 +236,6 @@
                 broadcastToClients(errorMessage);
             }
         });
-        
-        /**
-         * Broadcasts a message to all connected WebSocket clients.
-         * @param {string} message - The message to send.
-         */
-        function broadcastToClients(message) {
-            clients.forEach(client => {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(message);
-                } else {
-                    console.log('Skipping client as it is not open');
-                }
-            });
-        }
 
         ws.on('close', () => {
             console.log('WebSocket client disconnected');
