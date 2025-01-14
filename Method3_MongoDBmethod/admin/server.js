@@ -177,53 +177,59 @@
         ws.on('message', async (message) => {
             try {
                 console.log('Received message:', message.toString());
-
+        
                 // Ensure message is a string
                 const messageStr = typeof message === 'string' ? message : message.toString();
-
+        
                 // Split message to extract tableID and value
                 const values = messageStr.split('\t');
                 if (values.length !== 2) {
                     console.error('Expected 2 values, but received:', values);
+                    broadcastToClients(`Error: Expected 2 values but received ${values.join(', ')}`);
                     return;
                 }
-
+        
                 const tableID = parseInt(values[0].trim(), 10);
                 const value = parseInt(values[1].trim(), 10);
-
+        
                 if (isNaN(tableID) || isNaN(value)) {
                     console.error('One or more values could not be parsed as integers.');
+                    broadcastToClients('Error: Invalid tableID or value received.');
                     return;
                 }
-
+        
                 const labID = await getLabID(tableID);
-
+        
                 if (value === 2) {
                     await logToHelps(labID, tableID);
                 } else {
                     await logToResponses(labID, tableID, value);
                 }
-
-                // Send a confirmation message back to clients
+        
+                // Broadcast success message to all connected clients
                 const messageToSend = `tableID: ${tableID}, value: ${value}`;
-                clients.forEach(client => {
-                    if (client.readyState === WebSocket.OPEN) {
-                        client.send(messageToSend);
-                    } else {
-                        console.log('Skipping client as it is not open');
-                    }
-                });
+                broadcastToClients(messageToSend);
+        
             } catch (error) {
-                clients.forEach(client => {
-                    if (client.readyState === WebSocket.OPEN) {
-                        client.send(error);
-                    } else {
-                        console.log('Skipping client as it is not open');
-                    }
-                });
-                console.error('Error processing message:', error);
+                const errorMessage = `Error processing message: ${error.message || error}`;
+                console.error(errorMessage);
+                broadcastToClients(errorMessage);
             }
         });
+        
+        /**
+         * Broadcasts a message to all connected WebSocket clients.
+         * @param {string} message - The message to send.
+         */
+        function broadcastToClients(message) {
+            clients.forEach(client => {
+                if (client.readyState === WebSocket.OPEN) {
+                    client.send(message);
+                } else {
+                    console.log('Skipping client as it is not open');
+                }
+            });
+        }
 
         ws.on('close', () => {
             console.log('WebSocket client disconnected');
