@@ -47,6 +47,8 @@ void blinkLights(int n,int d){
   }
 }
 void setup() {
+  setupID();
+  Serial.begin(115200);
     // Setup input pins
   pinMode(LED, OUTPUT);
   pinMode(D1, INPUT_PULLUP);
@@ -57,9 +59,7 @@ void setup() {
   pinMode(D6, INPUT_PULLUP);
   pinMode(D7, INPUT_PULLUP);
   pinMode(3, INPUT_PULLUP); // RX pin (GPIO3) as input
-  setupID();
-  Serial.begin(115200);
-
+  
   // Connect to WiFi
   Serial.println("Connecting to WiFi...");
   WiFi.begin(ssid, password);
