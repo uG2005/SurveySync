@@ -1,7 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <WebSocketsClient.h>
 #include <WiFiClientSecure.h>
-
+#define LED D0
 // WiFi credentials
 const char* ssid = "LaptopCS";     // Replace with your WiFi credentials
 const char* password = "Chirag@2024";
@@ -38,7 +38,25 @@ void setupID() {
   }
 }
 
+void blinkLights(int n,int d){
+  for(int i=0;i<n;i++){
+    digitalWrite(LED, LOW);  // Turn the LED ON (active LOW)
+    delay(d);                     // Wait for 500 milliseconds
+    digitalWrite(LED, HIGH); // Turn the LED OFF
+    delay(d);   
+  }
+}
 void setup() {
+    // Setup input pins
+  pinMode(LED, OUTPUT);
+  pinMode(D1, INPUT_PULLUP);
+  pinMode(D2, INPUT_PULLUP);
+  pinMode(D3, INPUT_PULLUP);
+  pinMode(D4, INPUT_PULLUP);
+  pinMode(D5, INPUT_PULLUP);
+  pinMode(D6, INPUT_PULLUP);
+  pinMode(D7, INPUT_PULLUP);
+  pinMode(3, INPUT_PULLUP); // RX pin (GPIO3) as input
   setupID();
   Serial.begin(115200);
 
@@ -52,6 +70,7 @@ void setup() {
   }
 
   Serial.println("\nConnected to WiFi");
+  blinkLights(2,500);
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
 
@@ -60,16 +79,6 @@ void setup() {
   webSocket.onEvent(webSocketEvent);
   Serial.println("WebSocket client started.");
   
-  // Setup input pins
-  pinMode(D0, INPUT_PULLUP);
-  pinMode(D1, INPUT_PULLUP);
-  pinMode(D2, INPUT_PULLUP);
-  pinMode(D3, INPUT_PULLUP);
-  pinMode(D4, INPUT_PULLUP);
-  pinMode(D5, INPUT_PULLUP);
-  pinMode(D6, INPUT_PULLUP);
-  pinMode(D7, INPUT_PULLUP);
-  pinMode(3, INPUT_PULLUP); // RX pin (GPIO3) as input
 
 }
 
@@ -79,6 +88,7 @@ void sendData(int id, int value) {
   webSocket.sendTXT(dataToSend);
   Serial.print("Sent: ");
   Serial.println(dataToSend);
+  blinkLights(1,100);
 }
 
 int lastValue;
@@ -113,6 +123,7 @@ void decryptInput(int a, int b, int id) {
 }
 
 void loop() {
+
   int a = 1;
   int b = 1;
   // First module button RX, D2
@@ -149,14 +160,15 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     case WStype_DISCONNECTED:
       Serial.println("WebSocket Disconnected! Attempting to reconnect...");
       Serial.printf("Payload length: %u\n", length);
-      delay(10000); // Wait 10 seconds before reconnecting
+      // delay(10000); // Wait 10 seconds before reconnecting
+      blinkLights(10,1000); // 10 seconds
       webSocket.beginSSL(webSocketServerAddress, 443, webSocketServerPath);
       webSocket.onEvent(webSocketEvent);
       break;
     case WStype_CONNECTED:
       Serial.printf("WebSocket Connected to %s\n", webSocketServerAddress);
+      blinkLights(3,500);
       sendData(1111, -1);  // Send initial message or test data
-      sendData(9999, -1);  // Send initial message or test data
       break;
     case WStype_TEXT:
       Serial.printf("Received text: %s\n", payload);
