@@ -1,10 +1,9 @@
 #include <ESP8266WiFi.h>
 #include <WebSocketsClient.h>
 #include <WiFiClientSecure.h>
+#include <WiFiManager.h>
+
 #define LED D0
-// WiFi credentials
-const char* ssid = "LaptopCS";     // Replace with your WiFi credentials
-const char* password = "Chirag@2024";
 
 // WebSocket server address
 const char* webSocketServerAddress = "esp8266-control.onrender.com"; // Server URL (no need to specify port for wss)
@@ -46,6 +45,37 @@ void blinkLights(int n,int d){
     delay(d);   
   }
 }
+
+void setupWifi(){
+  digitalWrite(LED, LOW);
+  Serial.println("WiFi Setup");
+  WiFiManager wifiManager;
+  // Automatically start configuration portal if no WiFi is saved
+  if (!wifiManager.autoConnect("ESP8266-Config","surveysync")) {
+    Serial.println("Failed to connect and hit timeout");
+    delay(3000);
+    ESP.restart(); // Restart the device after timeout
+  }
+  // If connected, print the IP address
+  Serial.println("Connected to WiFi!");
+  blinkLights(2,500);
+  Serial.println("IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  // Manual WiFi connection
+  /*Serial.println("Connecting to WiFi...");
+  WiFi.begin(ssid, password); //fill ssid, pass
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.print(".");
+  }
+
+  Serial.println("\nConnected to WiFi");
+  blinkLights(2,500);
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());*/
+}
+
 void setup() {
   setupID();
   Serial.begin(115200);
@@ -60,26 +90,12 @@ void setup() {
   pinMode(D7, INPUT_PULLUP);
   pinMode(3, INPUT_PULLUP); // RX pin (GPIO3) as input
   
-  // Connect to WiFi
-  Serial.println("Connecting to WiFi...");
-  WiFi.begin(ssid, password);
-
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.print(".");
-  }
-
-  Serial.println("\nConnected to WiFi");
-  blinkLights(2,500);
-  Serial.print("IP Address: ");
-  Serial.println(WiFi.localIP());
+  setupWifi();
 
   // Initialize WebSocket with SSL (secure connection using port 443 for wss)
   webSocket.beginSSL(webSocketServerAddress, 443, webSocketServerPath); // Port 443 for SSL (wss://)
   webSocket.onEvent(webSocketEvent);
   Serial.println("WebSocket client started.");
-  
-
 }
 
 void sendData(int id, int value) {
@@ -92,7 +108,6 @@ void sendData(int id, int value) {
 }
 
 int lastValue;
-
 void decryptInput(int a, int b, int id) {
   int value;
   if (a == 0 && b == 0) {
@@ -122,7 +137,25 @@ void decryptInput(int a, int b, int id) {
   }
 }
 
+int reconnectAttempts = 0;
 void loop() {
+
+  // wifi disconnect logic
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi disconnected. Attempting to reconnect...");
+    reconnectAttempts++;
+
+    // Retry 5 times before restarting
+    if (reconnectAttempts > 5) {
+      Serial.println("Max reconnect attempts reached. Restarting...");
+      ESP.restart();
+    }
+
+    delay(2000); // Wait 2 seconds before retrying
+    setupWifi(); // Attempt to reconnect
+  } else {
+    reconnectAttempts = 0; // Reset attempts if connected
+  }
 
   int a = 1;
   int b = 1;
@@ -158,6 +191,10 @@ void loop() {
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
   switch (type) {
     case WStype_DISCONNECTED:
+      if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("WiFi disconnected. Attempting to reconnect...");
+        setupWifi();
+      }
       Serial.println("WebSocket Disconnected! Attempting to reconnect...");
       Serial.printf("Payload length: %u\n", length);
       // delay(10000); // Wait 10 seconds before reconnecting
