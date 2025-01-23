@@ -118,7 +118,7 @@ app.get('/lab/:labID', async (req, res) => {
         const helpsInIST = helps.map(help => ({
             ...help,
             // helpStarted: updateIST(new Date(help.helpStarted)) // Convert helpStarted to IST
-            helpStarted: updateIST(new Date(help.helpStarted))
+            helpStarted: new Date(help.helpStarted)
         }));
 
         // Fetch the lab number
@@ -153,6 +153,8 @@ async function getLabID(tableID) {
         }
 
         const currentTime = toIST(new Date());
+        console.log("Current Time: ");
+        console.log(currentTime);
 
         const schedule = await db.collection('Schedule').findOne({
             labNo: labNo,
