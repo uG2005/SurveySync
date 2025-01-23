@@ -7,6 +7,7 @@ SurveySync is a tool designed to synchronize survey data efficiently. This repos
 - [Overview](#overview)
 - [Features](#features)
 - [Usage](#usage)
+- [Tracking](#tracking)
 - [Troubleshooting](#troubleshooting)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
@@ -26,7 +27,7 @@ This method leverages MongoDB's capabilities to manage and synchronize survey da
 - **Flexibility**: Easily adaptable to various survey formats and structures.
 
 ## Usage
-- Open your browser and navigate to [SurveySync | Dashboard ](https://esp8266-control.onrender.com/) to access the SurveySync dashboard.
+- Open your browser and navigate to [SurveySync | Admin](https://esp8266-control.onrender.com/) to access the SurveySync dashboard.
 - When the website has completely loaded, go to the `Activity` section and click `Connect`
 - Continue to the next step if the text `New Client Added | Total = 1` shows in the terminal. If connection fails, it means the website has not completly loaded yet.
 - Plug in the ESP8266 module into a power source. If the module was previously connected to a WiFi that still exists, it will connect to it. Else, the blue light will stay on.
@@ -36,6 +37,9 @@ This method leverages MongoDB's capabilities to manage and synchronize survey da
 - After this, it will attempt connecting to the website. The text `New Client Added | Total = 2` will show on the website activity terminal, and the blue light will blink 3 times. A test data will be sent, and will show up on the terminal.
 - Every time a signal is sent, it will show up on the terminal, and the blue light will blink quickly
 
+## Tracking
+- To track the Help Calls for all active labs, go to [SurveySync | Help](https://help-responses.onrender.com/)
+- To see data about voting for separate labs, rooms and other parameters, go to [SurveySync | Dashboard](https://dashboard-e9g1.onrender.com/)
 ## Troubleshooting
 To torubleshoot, it is important to know what the ESP light means:
 - `Single Quick Blink`: WiFi and Websocket are connected, and data was just sent
