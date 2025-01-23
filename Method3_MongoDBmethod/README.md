@@ -1,4 +1,4 @@
-# SurveySync: Method 3 - MongoDB Integration
+# SurveySync: Working Model
 
 SurveySync is a tool designed to synchronize survey data efficiently. This repository focuses on **Method 3**, which utilizes MongoDB for data synchronization.
 
