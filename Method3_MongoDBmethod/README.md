@@ -43,7 +43,7 @@ To torubleshoot, it is important to know what the ESP light means:
 - `Three Blinks` : Connected to Website/Websocket
 - `10 Slow Blinks` : Websocket disconnected, will try connecting back to the Website after light stops blinking
 - `Static Blue Light`: Couldn't connect to last saved WiFi, please connect to `ESP8266 - Control` and enter WiFi credentials
-- 
+  
 To troubleshoot, the following scenarios are possible. In each scenario, a problem is indicated by 10 slow blinks.
 ### Static blue light starts slow blinking after saving credentials, or doesn't blink for a long time
 Usually means that the WiFi credentials provided did not work, and it's trying to reconnect again and again. After some time, the static light will reappaer
