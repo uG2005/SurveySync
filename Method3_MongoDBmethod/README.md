@@ -6,10 +6,10 @@ SurveySync is a tool designed to synchronize survey data efficiently. This repos
 
 - [Overview](#overview)
 - [Features](#features)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
 - [Usage](#usage)
 - [Troubleshooting](#troubleshooting)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
 - [Data Synchronization](#data-synchronization)
 - [Error Handling](#error-handling)
 - [Contributing](#contributing)
@@ -25,31 +25,6 @@ This method leverages MongoDB's capabilities to manage and synchronize survey da
 - **Scalability**: Handles large volumes of survey data efficiently.
 - **Flexibility**: Easily adaptable to various survey formats and structures.
 
-## Prerequisites
-
-Before setting up SurveySync, ensure you have the following:
-
-- **MongoDB**: A running instance of MongoDB. For optimal performance, a replica set configuration is recommended. ([MongoDB Documentation](https://www.mongodb.com/docs/manual/core/replica-set-sync/))
-- **Node.js**: Version 14.x or higher.
-- **npm**: Node package manager.
-
-## Installation
-
-1. **Clone the Repository**:
-
-   ```bash
-   git clone https://github.com/Snehgal/SurveySync.git
-   ```
-2. ** Navigate to the Method3_MongoDBmethod Directory:**
-
-    ```bash
-    cd SurveySync/Method3_MongoDBmethod
-    ```
-3. ** Install Dependencies **
-   ```bash
-   npm install
-   ```
-   
 ## Usage
 - Open your browser and navigate to [SurveySync | Dashboard ](https://esp8266-control.onrender.com/) to access the SurveySync dashboard.
 - When the website has completely loaded, go to the `Activity` section and click `Connect`
@@ -77,6 +52,32 @@ Means that the ESP8266 was not able to connect to the websocket. The only reason
 ### Was working correctly but starts slow blinking
 WiFi network disconnected. Fastest way to fix it to switch it off, and on again; and check if static blue light appears.
 
+# Duplicating the Process
+If you wish to duplicate this on your localhost, do the following:
+## Prerequisites
+
+Before setting up SurveySync, ensure you have the following:
+
+- **MongoDB**: A running instance of MongoDB. For optimal performance, a replica set configuration is recommended. ([MongoDB Documentation](https://www.mongodb.com/docs/manual/core/replica-set-sync/))
+- **Node.js**: Version 14.x or higher.
+- **npm**: Node package manager.
+
+## Installation
+
+1. **Clone the Repository**:
+
+   ```bash
+   git clone https://github.com/Snehgal/SurveySync.git
+   ```
+2. ** Navigate to the Method3_MongoDBmethod Directory:**
+
+    ```bash
+    cd SurveySync/Method3_MongoDBmethod
+    ```
+3. ** Install Dependencies **
+   ```bash
+   npm install
+   ```
 
 ## Data Synchronization
 SurveySync employs MongoDB's change streams to monitor real-time changes in the survey data. This ensures that any new responses or updates are immediately reflected across all connected platforms. For more information on MongoDB's change streams, refer to the official MongoDB documentation.
