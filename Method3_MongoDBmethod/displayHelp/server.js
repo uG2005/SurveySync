@@ -105,7 +105,7 @@ app.get('/lab/:labID', async (req, res) => {
         // Convert unresolvedHelps to IST
         const unresolvedHelpsInIST = unresolvedHelps.map(help => ({
             ...help,
-            issueRaised: updateIST(new Date()) // Convert issueRaised to IST
+            issueRaised: (new Date()) // Convert issueRaised to IST
         }));
 
         // Fetch active helps for the specific labID
@@ -118,7 +118,7 @@ app.get('/lab/:labID', async (req, res) => {
         const helpsInIST = helps.map(help => ({
             ...help,
             // helpStarted: updateIST(new Date(help.helpStarted)) // Convert helpStarted to IST
-            helpStarted: (new Date(help.helpStarted))
+            helpStarted: updateIST(new Date(help.helpStarted))
         }));
 
         // Fetch the lab number
@@ -152,7 +152,7 @@ async function getLabID(tableID) {
             throw new Error(`Invalid labNo retrieved for tableID: ${tableID}`);
         }
 
-        const currentTime = updateIST(new Date());
+        const currentTime = toIST(new Date());
 
         const schedule = await db.collection('Schedule').findOne({
             labNo: labNo,
