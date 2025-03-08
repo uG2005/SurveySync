@@ -21,6 +21,11 @@ body {
     justify-content: center;
     width: 80px;  /* Adjust width */
     height: 30px; /* Adjust height */
+    background-color: #007bff; /* Keep the blue color */
+    border: none; /* Remove border if any */
+    border-radius: 20px; /* Match the rounded style */
+    box-shadow: 2px 2px 8px #000000ed; /* Black shadow */
+    transition: background-color 0.2s;
 }
 
 
