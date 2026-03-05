@@ -12,18 +12,12 @@
 <body>
     <header>Admin: Feedback Collection</header>
     <nav>
-        <button onclick="scrollToSection('dashboard-section')" id="dashboard-btn">Dashboard</button>
         <button onclick="scrollToSection('containerS')" id="schedule-section-btn">Schedule</button>
+        <button onclick="scrollToSection('layout-section')" id="layout-btn">Seat Layout</button>
         <button onclick="scrollToSection('activity-section')" id="activity-btn">Activity</button>
         <button id="help-btn">Help-Tracking</button>
         <button id="dshbrd">Data Visualisation</button>
-
-
     </nav>
-    <div id="dashboard-section" class="section">
-        <iframe id="dashboard-iframe"
-            src="https://charts.mongodb.com/charts-project-0-etgqbrt/embed/dashboards?id=af85e0d3-9303-4ea3-9259-909b2b49aa1f&theme=dark&autoRefresh=true&maxDataAge=300&showTitleAndDesc=true&scalingWidth=scale&scalingHeight=fixed"></iframe>
-    </div>
     
     <div id="containerS" class="section">
         <!-- Schedule Form -->
@@ -59,6 +53,18 @@
                     <input type="datetime-local" id="endTime" name="endTime" required>
                 </div>
             </div>
+            <div class="form-row repeat-row">
+                <div class="repeat-toggle">
+                    <label for="repeatWeekly">
+                        <input type="checkbox" id="repeatWeekly" name="repeatWeekly">
+                        Repeat Weekly
+                    </label>
+                </div>
+                <div id="repeatUntilWrapper" style="display: none;">
+                    <label for="repeatUntil">Repeat Until:</label>
+                    <input type="date" id="repeatUntil" name="repeatUntil">
+                </div>
+            </div>
             <button type="submit">Add Record</button>
         </form>
         <!-- Modal -->
@@ -73,14 +79,78 @@
          <div id="data-containerS-wrapper">
             <h2 id="data-heading" style="font-weight: bold; cursor: pointer;">
                 <span id="toggle-indicator" style="font-size: 18px; margin-left: 10px;">▼</span>
-                Current Records
+                Schedule Records
             </h2>
-            <div></div>
+            <div class="schedule-tabs">
+                <button class="tab-btn active" data-tab="ongoing">Ongoing</button>
+                <button class="tab-btn" data-tab="past">Past (7 days)</button>
+                <button class="tab-btn" data-tab="upcoming">Upcoming (7 days)</button>
+                <button class="tab-btn" data-tab="all">All</button>
+            </div>
             <div id="data-containerS">
                 <!-- Records will be appended here -->
             </div>
         </div>
     </div>
+
+    <!-- ── Seat Layout Section ── -->
+    <div id="layout-section" class="section">
+        <div id="layout-container">
+            <h2>Seat Layout Manager</h2>
+
+            <div class="layout-form">
+                <div class="form-row">
+                    <div>
+                        <label for="layoutRoom">Lab (Room):</label>
+                        <select id="layoutRoom">
+                            <option value="">— Select Room —</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Current layout status -->
+                <div id="layoutStatus" class="layout-status"></div>
+
+                <!-- Existing layout preview -->
+                <div id="existingLayoutPreview" style="display:none;"></div>
+
+                <hr style="margin: 20px 0; border-color: #eee;">
+
+                <h3 style="color: #007BFF; margin-bottom: 14px;">Configure Layout</h3>
+                <div class="form-row">
+                    <div>
+                        <label for="layoutRows">Total Rows:</label>
+                        <input type="number" id="layoutRows" min="1" max="20" placeholder="e.g. 5">
+                    </div>
+                    <div>
+                        <label for="layoutSeatsPerRow">Seats Per Row:</label>
+                        <input type="number" id="layoutSeatsPerRow" min="1" max="30" placeholder="e.g. 8">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div>
+                        <label for="layoutOddRow">Odd Row Position:</label>
+                        <select id="layoutOddRow">
+                            <option value="right">Right wall</option>
+                            <option value="left">Left wall</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="layoutStartID">Start Table ID:</label>
+                        <input type="number" id="layoutStartID" min="1" placeholder="e.g. 1001">
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
+                    <button type="button" id="previewLayoutBtn">Preview Layout</button>
+                    <button type="button" id="saveLayoutBtn" style="display:none;">Confirm &amp; Save</button>
+                </div>
+            </div>
+
+            <!-- Preview area -->
+            <div id="layoutPreviewArea" style="display:none;"></div>
+        </div>
+    </div>
+
         <div id="activity-section" class="section">
             <div id="container">
                 <div id="data-container-wrapper">

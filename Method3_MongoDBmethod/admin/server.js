@@ -254,46 +254,69 @@
 
     console.log(`WebSocket server running at wss://esp8266-control.onrender.com/`);
 
-    // Example Endpoints
+    // Get schedule records with optional filter
     app.get('/get-records', async (req, res) => {
         try {
             await connectToMongoDB();
-            const records = await db.collection('Schedule').find({}).toArray();
+            const filter = req.query.filter || 'all';
+            const now = toIST(new Date());
+            let query = {};
+
+            if (filter === 'ongoing') {
+                // Labs where now is between startTime and endTime
+                query = { startTime: { $lte: now }, endTime: { $gte: now } };
+            } else if (filter === 'past') {
+                // Labs that ended within the last 7 days
+                const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                query = { endTime: { $lt: now, $gte: sevenDaysAgo } };
+            } else if (filter === 'upcoming') {
+                // Labs starting within the next 7 days
+                const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                query = { startTime: { $gt: now, $lte: sevenDaysLater } };
+            }
+            // 'all' → empty query returns everything
+
+            const records = await db.collection('Schedule').find(query).sort({ startTime: 1 }).toArray();
             res.json(records);
         } catch (error) {
+            console.error('Error retrieving records:', error);
             res.status(500).send('Error retrieving records');
         }
     });
 
-    // Endpoint to add a record to "Schedule"
+    // Endpoint to add record(s) to "Schedule" (supports bulk weekly repeat)
     app.post('/add-schedule', async (req, res) => {
         try {
             await connectToMongoDB(); // Ensure connection is established
-            const record = req.body;
+            const { records } = req.body;
 
-            // Parse startTime and endTime as Date objects and convert to IST
-            const startTimeUTC = new Date(record.startTime);
-            const endTimeUTC = new Date(record.endTime);
-
-            const startTimeIST = toIST(startTimeUTC); // Convert to IST
-            const endTimeIST = toIST(endTimeUTC);     // Convert to IST
-
-            record.startTime = startTimeIST; // Store as IST Date object
-            record.endTime = endTimeIST;     // Store as IST Date object
-
-            // Check if a record with the same labID already exists
-            const existingRecord = await db.collection('Schedule').findOne({ labID: record.labID });
-
-            if (existingRecord) {
-                // If a record exists, send an error response
-                res.status(400).json({ message: 'Record with this labID already exists' });
-            } else {
-                // If no record exists, insert the new record
-                await db.collection('Schedule').insertOne(record);
-                res.status(200).json({ message: 'Record added successfully!' });
+            if (!records || !Array.isArray(records) || records.length === 0) {
+                return res.status(400).json({ success: false, message: 'No records provided' });
             }
+
+            // Check for duplicate labIDs before inserting any
+            const labIDs = records.map(r => r.labID);
+            const existing = await db.collection('Schedule').find({ labID: { $in: labIDs } }).toArray();
+            if (existing.length > 0) {
+                const dupes = existing.map(e => e.labID).join(', ');
+                return res.status(400).json({ success: false, message: `These labIDs already exist: ${dupes}` });
+            }
+
+            // Convert times to IST for each record
+            const docs = records.map(record => {
+                return {
+                    ...record,
+                    startTime: toIST(new Date(record.startTime)),
+                    endTime: toIST(new Date(record.endTime))
+                };
+            });
+
+            await db.collection('Schedule').insertMany(docs);
+            const count = docs.length;
+            res.status(200).json({ success: true, message: `${count} record${count > 1 ? 's' : ''} added successfully!` });
         } catch (error) {
-            res.status(500).send('Error adding record');
+            console.error('Error adding record(s):', error);
+            res.status(500).json({ success: false, message: 'Error adding record(s)' });
         }
     });
 
@@ -313,6 +336,56 @@
         } catch (error) {
             console.error('Error fetching room numbers:', error);
             res.status(500).json({ error: 'Internal server error' });
+        }
+    });
+
+    // Fetch existing seat layout for a room
+    app.get('/get-seat-layout/:labNo', async (req, res) => {
+        try {
+            await connectToMongoDB();
+            const labNo = req.params.labNo;
+            const layout = await db.collection('SeatLayouts').findOne({ _id: labNo });
+
+            if (layout) {
+                res.json({ exists: true, layout });
+            } else {
+                res.json({ exists: false });
+            }
+        } catch (error) {
+            console.error('Error fetching seat layout:', error);
+            res.status(500).json({ error: 'Internal server error' });
+        }
+    });
+
+    // Save (upsert) a seat layout for a room
+    app.post('/save-seat-layout', async (req, res) => {
+        try {
+            await connectToMongoDB();
+            const { labNo, totalRows, seatsPerRow, oddRowPosition, seats } = req.body;
+
+            if (!labNo || !totalRows || !seatsPerRow || !seats || !Array.isArray(seats)) {
+                return res.status(400).json({ success: false, message: 'Missing required fields' });
+            }
+
+            const doc = {
+                _id: labNo,
+                totalRows,
+                seatsPerRow,
+                oddRowPosition,
+                seats
+            };
+
+            const result = await db.collection('SeatLayouts').replaceOne(
+                { _id: labNo },
+                doc,
+                { upsert: true }
+            );
+
+            const action = result.upsertedCount > 0 ? 'created' : 'updated';
+            res.json({ success: true, message: `Layout ${action} for "${labNo}".` });
+        } catch (error) {
+            console.error('Error saving seat layout:', error);
+            res.status(500).json({ success: false, message: 'Internal server error' });
         }
     });
 

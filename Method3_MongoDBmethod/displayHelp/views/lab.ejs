@@ -57,6 +57,24 @@
             filter: drop-shadow(1px 1px 8px black);
         }
 
+        .view-toggle {
+            font-size: 13px;
+            color: white;
+            text-decoration: none;
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            padding: 5px 14px;
+            border-radius: 20px;
+            transition: background 0.2s;
+        }
+
+        .view-toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
         .container {
             margin-top: 60px;
             /* Space for fixed header */
@@ -231,8 +249,9 @@
 
 <body>
     <header>
-        <a class="back-link" href="/">&#x21a9; Back</a>
+        <a class="back-link" href="/">&#x21a9;</a>
         Help Calls for <%= labNumber %>
+        <a class="view-toggle" href="/lab/<%= labID %>/map">Map View</a>
     </header>
     <div id="notification" class="notification hidden"></div>
     <div class="container">

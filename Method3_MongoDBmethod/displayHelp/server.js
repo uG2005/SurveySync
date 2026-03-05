@@ -183,7 +183,7 @@ app.get('/lab/:labID', async (req, res) => {
         console.log('Helps for labID:', labID, helpsInIST);
         console.log('Unresolved Helps for labID:', labID, unresolvedHelpsInIST);
 
-        res.render('lab', { labNumber, helps:helpsInIST, UnresolvedHelps: unresolvedHelpsInIST });
+        res.render('lab', { labNumber, labID, helps:helpsInIST, UnresolvedHelps: unresolvedHelpsInIST });
     } catch (error) {
         console.error("Error fetching data:", error);
         res.status(500).send(error);

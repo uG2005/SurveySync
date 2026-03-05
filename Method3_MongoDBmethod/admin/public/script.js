@@ -66,7 +66,46 @@ window.onclick = function(event) {
     }
 }
 
-// Add new record
+// Toggle repeat-until date picker visibility
+document.getElementById('repeatWeekly').addEventListener('change', function () {
+    const wrapper = document.getElementById('repeatUntilWrapper');
+    wrapper.style.display = this.checked ? 'block' : 'none';
+    if (!this.checked) {
+        document.getElementById('repeatUntil').value = '';
+    }
+});
+
+// Build array of weekly records
+function buildRecords(courseCode, batch, labNumberStart, labNo, startTime, endTime, repeatWeekly, repeatUntil) {
+    const records = [];
+    let currentStart = new Date(startTime);
+    let currentEnd = new Date(endTime);
+    let labNum = parseInt(labNumberStart, 10);
+    const until = repeatWeekly && repeatUntil ? new Date(repeatUntil) : null;
+
+    while (true) {
+        let labNumber = String(labNum).padStart(2, '0');
+        const labID = courseCode + '-' + batch + '-' + labNumber;
+        records.push({
+            labID,
+            labNo,
+            startTime: currentStart.toISOString(),
+            endTime: currentEnd.toISOString()
+        });
+
+        if (!until) break; // single record
+
+        // Advance by 7 days
+        currentStart = new Date(currentStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+        currentEnd = new Date(currentEnd.getTime() + 7 * 24 * 60 * 60 * 1000);
+        labNum++;
+
+        if (currentStart > until) break;
+    }
+    return records;
+}
+
+// Add new record(s)
 document.getElementById('scheduleForm').addEventListener('submit', function (event) {
     event.preventDefault();
 
@@ -77,6 +116,8 @@ document.getElementById('scheduleForm').addEventListener('submit', function (eve
     const labNoElem = document.getElementById('roomNumber');
     const startTimeElem = document.getElementById('startTime');
     const endTimeElem = document.getElementById('endTime');
+    const repeatWeeklyElem = document.getElementById('repeatWeekly');
+    const repeatUntilElem = document.getElementById('repeatUntil');
     
     if (!courseCodeElem || !batchElem || !labNumberElem || !labNoElem || !startTimeElem || !endTimeElem) {
         console.error('One or more form elements are missing.');
@@ -85,38 +126,37 @@ document.getElementById('scheduleForm').addEventListener('submit', function (eve
 
     const courseCode = courseCodeElem.value;
     const batch = batchElem.value;
-    let labNumber = labNumberElem.value;
+    const labNumber = labNumberElem.value;
     const labNo = labNoElem.value;
-    const startTime = new Date(startTimeElem.value).toISOString();
-    const endTime = new Date(endTimeElem.value).toISOString();
+    const startTime = startTimeElem.value;
+    const endTime = endTimeElem.value;
+    const repeatWeekly = repeatWeeklyElem.checked;
+    const repeatUntil = repeatUntilElem.value;
 
-    if (labNumber.length === 1) {
-        labNumber = '0' + labNumber;
+    if (repeatWeekly && !repeatUntil) {
+        showModal('Please select a "Repeat Until" date.');
+        return;
     }
-    const labID = courseCode + '-' + batch + '-' + labNumber;
-    const record = {
-        labID,
-        labNo,
-        startTime,
-        endTime
-    };
+
+    const records = buildRecords(courseCode, batch, labNumber, labNo, startTime, endTime, repeatWeekly, repeatUntil);
 
     fetch('/add-schedule', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify(record)
+        body: JSON.stringify({ records })
     })
     .then(response => response.json())
     .then(result => {
-        if (result.message === 'Record added successfully!') {
+        if (result.success) {
             loadRecords();
             document.getElementById('scheduleForm').reset();
-            showModal('Record added successfully!');
+            document.getElementById('repeatUntilWrapper').style.display = 'none';
+            showModal(result.message);
         } else {
-            console.error('Failed to add record:', result.message);
-            showModal('Failed to add record: ' + result.message);
+            console.error('Failed to add record(s):', result.message);
+            showModal('Failed: ' + result.message);
         }
     })
     .catch(error => {
@@ -132,10 +172,24 @@ function adjustIST(date) {
     // return date;
 }
 
-// Load records from the server
-function loadRecords() {
-    window.scroll(0,65); 
-    fetch('/get-records')
+// Current active tab
+let activeTab = 'ongoing';
+
+// Tab click handling
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', function () {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        activeTab = this.dataset.tab;
+        loadRecords(activeTab);
+    });
+});
+
+// Load records from the server with a filter
+function loadRecords(filter) {
+    filter = filter || activeTab;
+    const url = '/get-records?filter=' + encodeURIComponent(filter);
+    fetch(url)
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! Status: ${response.status}`);
@@ -171,12 +225,11 @@ function loadRecords() {
                         <span>${adjustIST(new Date(record.endTime)).toLocaleDateString({ weekday:"short", year: "numeric", month: "short", day: "numeric" })}</span>
                         <span>${adjustIST(new Date(record.startTime)).toLocaleTimeString()}</span>
                         <span>${adjustIST(new Date(record.endTime)).toLocaleTimeString()}</span>
-
                     `;
                     dataContainerS.appendChild(entry);
                 });
             } else {
-                dataContainerS.innerHTML = '<div>No records found</div>';
+                dataContainerS.innerHTML = '<div class="no-records">No records found</div>';
             }
         })
         .catch(error => {
@@ -184,23 +237,236 @@ function loadRecords() {
         });
 }
 
-
-// document.getElementById('search-input').addEventListener('input', function() {
-//     const query = this.value.toLowerCase();
-//     const cards = document.querySelectorAll('#data-containerS .card');
-
-//     cards.forEach(card => {
-//         const cardText = card.textContent.toLowerCase();
-//         if (cardText.includes(query)) {
-//             card.style.display = '';
-//         } else {
-//             card.style.display = 'none';
-//         }
-//     });
-// });
-
 // Load room numbers and records on page load
 window.onload = function () {
     loadRoomNumbers();
-    loadRecords();
+    loadRecords('ongoing');
+    loadLayoutRoomNumbers();
 };
+
+// ═══════════════════════════════════════════════════
+// ══  Seat Layout Manager
+// ═══════════════════════════════════════════════════
+
+function loadLayoutRoomNumbers() {
+    fetch('/get-room-numbers')
+        .then(r => r.json())
+        .then(rooms => {
+            const sel = document.getElementById('layoutRoom');
+            // keep the placeholder
+            sel.innerHTML = '<option value="">— Select Room —</option>';
+            rooms.forEach(room => {
+                const opt = document.createElement('option');
+                opt.value = room;
+                opt.textContent = room;
+                sel.appendChild(opt);
+            });
+        })
+        .catch(err => console.error('Error loading layout rooms:', err));
+}
+
+// When a room is selected, fetch its existing layout
+document.getElementById('layoutRoom').addEventListener('change', function () {
+    const room = this.value;
+    const statusDiv = document.getElementById('layoutStatus');
+    const existingPreview = document.getElementById('existingLayoutPreview');
+    const previewArea = document.getElementById('layoutPreviewArea');
+    const saveBtn = document.getElementById('saveLayoutBtn');
+
+    // Reset
+    existingPreview.style.display = 'none';
+    existingPreview.innerHTML = '';
+    previewArea.style.display = 'none';
+    previewArea.innerHTML = '';
+    saveBtn.style.display = 'none';
+
+    if (!room) {
+        statusDiv.innerHTML = '';
+        return;
+    }
+
+    statusDiv.innerHTML = '<span style="color:#888;">Loading…</span>';
+
+    fetch('/get-seat-layout/' + encodeURIComponent(room))
+        .then(r => r.json())
+        .then(data => {
+            if (data.exists) {
+                const layout = data.layout;
+                statusDiv.innerHTML = '<span style="color:#28a745; font-weight:600;">✔ Layout exists</span>'
+                    + ' &nbsp;|&nbsp; '
+                    + '<span>' + layout.totalRows + ' rows × ' + layout.seatsPerRow + ' seats'
+                    + (layout.oddRowPosition ? ' (odd row: ' + layout.oddRowPosition + ')' : '')
+                    + '</span>';
+
+                // Fill inputs with existing values
+                document.getElementById('layoutRows').value = layout.totalRows;
+                document.getElementById('layoutSeatsPerRow').value = layout.seatsPerRow;
+                document.getElementById('layoutOddRow').value = layout.oddRowPosition || 'right';
+                // Deduce startTableID from first seat
+                const startID = layout.seats.length > 0 ? layout.seats[0].tableID : 1001;
+                document.getElementById('layoutStartID').value = startID;
+
+                // Show existing layout preview
+                existingPreview.style.display = 'block';
+                existingPreview.innerHTML = '<h3 style="color:#333; margin-bottom:8px;">Current Layout</h3>'
+                    + buildGridPreviewHTML(layout.totalRows, layout.seatsPerRow, layout.oddRowPosition || 'right', startID);
+            } else {
+                statusDiv.innerHTML = '<span style="color:#dc3545; font-weight:600;">✘ NO LAYOUT ADDED</span>';
+                // Clear inputs
+                document.getElementById('layoutRows').value = '';
+                document.getElementById('layoutSeatsPerRow').value = '';
+                document.getElementById('layoutStartID').value = '';
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            statusDiv.innerHTML = '<span style="color:#dc3545;">Error fetching layout</span>';
+        });
+});
+
+// ── Grid layout computation (mirrors server-side computeGridLayout) ──
+
+function computeGridLayoutClient(totalRows, oddRowPosition) {
+    const groups = [];
+
+    if (totalRows % 2 === 1) {
+        if (oddRowPosition === 'left') {
+            groups.push([0]);
+            for (let i = 1; i < totalRows; i += 2) groups.push([i, i + 1]);
+        } else {
+            for (let i = 0; i < totalRows - 1; i += 2) groups.push([i, i + 1]);
+            groups.push([totalRows - 1]);
+        }
+    } else {
+        for (let i = 0; i < totalRows; i += 2) groups.push([i, i + 1]);
+    }
+
+    let col = 1;
+    const columnMap = {};
+    const gridTemplateParts = [];
+
+    groups.forEach((group, gi) => {
+        group.forEach(r => {
+            columnMap[r] = col;
+            col++;
+            gridTemplateParts.push('minmax(55px, 1fr)');
+        });
+        if (gi < groups.length - 1) {
+            col++;
+            gridTemplateParts.push('20px');
+        }
+    });
+
+    return { columnMap, gridTemplate: gridTemplateParts.join(' '), totalGridCols: col - 1, groups };
+}
+
+function buildGridPreviewHTML(totalRows, seatsPerRow, oddRowPosition, startTableID) {
+    const { columnMap, gridTemplate, groups } = computeGridLayoutClient(totalRows, oddRowPosition);
+
+    // Build seats array (row-major)
+    const seats = [];
+    let tid = startTableID;
+    for (let row = 0; row < totalRows; row++) {
+        for (let seat = 0; seat < seatsPerRow; seat++) {
+            seats.push({ row, seat, tableID: tid++ });
+        }
+    }
+
+    let html = '';
+    html += '<div class="layout-room-preview">';
+
+    // Whiteboard
+    html += '<div class="preview-whiteboard">WHITEBOARD</div>';
+
+    // Grid
+    html += '<div class="preview-grid" style="grid-template-columns: ' + gridTemplate + ';">';
+    seats.forEach(s => {
+        const gcol = columnMap[s.row];
+        const grow = s.seat + 1;
+        html += '<div class="preview-seat" style="grid-column:' + gcol + '; grid-row:' + grow + ';">'
+            + s.tableID
+            + '</div>';
+    });
+    html += '</div>'; // grid
+
+    // Legend: groups
+    html += '<div class="preview-legend">';
+    groups.forEach((group, gi) => {
+        const label = group.length === 1
+            ? 'Row ' + group[0] + ' (solo)'
+            : 'Rows ' + group[0] + '–' + group[1] + ' (pair)';
+        html += '<span class="preview-group-label">' + label + '</span>';
+        if (gi < groups.length - 1) html += '<span class="preview-aisle-label">aisle</span>';
+    });
+    html += '</div>';
+
+    html += '</div>'; // room
+    return html;
+}
+
+// Preview button
+document.getElementById('previewLayoutBtn').addEventListener('click', function () {
+    const totalRows = parseInt(document.getElementById('layoutRows').value, 10);
+    const seatsPerRow = parseInt(document.getElementById('layoutSeatsPerRow').value, 10);
+    const oddRowPosition = document.getElementById('layoutOddRow').value;
+    const startTableID = parseInt(document.getElementById('layoutStartID').value, 10);
+
+    if (isNaN(totalRows) || totalRows < 1) { showModal('Enter a valid total rows (≥ 1)'); return; }
+    if (isNaN(seatsPerRow) || seatsPerRow < 1) { showModal('Enter a valid seats per row (≥ 1)'); return; }
+    if (isNaN(startTableID) || startTableID < 1) { showModal('Enter a valid start table ID'); return; }
+
+    const previewArea = document.getElementById('layoutPreviewArea');
+    previewArea.style.display = 'block';
+    previewArea.innerHTML = '<h3 style="color:#333; margin-bottom:8px;">Preview</h3>'
+        + buildGridPreviewHTML(totalRows, seatsPerRow, oddRowPosition, startTableID);
+
+    document.getElementById('saveLayoutBtn').style.display = 'inline-block';
+});
+
+// Save button
+document.getElementById('saveLayoutBtn').addEventListener('click', function () {
+    const room = document.getElementById('layoutRoom').value;
+    if (!room) { showModal('Please select a room first.'); return; }
+
+    const totalRows = parseInt(document.getElementById('layoutRows').value, 10);
+    const seatsPerRow = parseInt(document.getElementById('layoutSeatsPerRow').value, 10);
+    const oddRowPosition = document.getElementById('layoutOddRow').value;
+    const startTableID = parseInt(document.getElementById('layoutStartID').value, 10);
+
+    // Build seats array
+    const seats = [];
+    let tid = startTableID;
+    for (let row = 0; row < totalRows; row++) {
+        for (let seat = 0; seat < seatsPerRow; seat++) {
+            seats.push({ row, seat, tableID: tid++ });
+        }
+    }
+
+    const payload = {
+        labNo: room,
+        totalRows,
+        seatsPerRow,
+        oddRowPosition: totalRows % 2 === 1 ? oddRowPosition : null,
+        seats
+    };
+
+    fetch('/save-seat-layout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            showModal(result.message);
+            // Refresh the existing preview
+            document.getElementById('layoutRoom').dispatchEvent(new Event('change'));
+        } else {
+            showModal('Error: ' + result.message);
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        showModal('Error saving layout');
+    });
+});
