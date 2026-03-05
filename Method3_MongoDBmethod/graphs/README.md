@@ -112,3 +112,11 @@ Returns detailed records (same filters as `/data`) for Excel export.
 | `UnresolvedHelps` | Stores unresolved help requests          |
 
 The `labID` format is `course-batch-lab` (e.g., `CSE101-B1-L3`).
+
+## Related Services
+
+| Service | Port | Purpose |
+|---|---|---|
+| `admin/` | 3000 | Schedule management, seat layout configuration, WebSocket handler |
+| `displayHelp/` | 4000 | Real-time help-request display with seat map |
+| `helpArchive/` | 4000 | Historical help records |

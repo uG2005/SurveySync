@@ -41,9 +41,16 @@ Four tabs filter the schedule records:
 - Connect/disconnect controls for the admin client
 - Broadcasts status updates (client count, errors, inserts) to all connected admin clients
 
-### 5. Dashboard & Data Visualisation
-- Embedded MongoDB Charts dashboard for at-a-glance analytics
-- Links to external Help-Tracking and Data Visualisation dashboards
+### 5. Seat Layout Manager
+- Select a lab room from a dropdown
+- If a layout exists, see the current grid preview (whiteboard, paired rows, aisles)
+- If no layout exists, see a clear **"NO LAYOUT ADDED"** indicator
+- Configure: total rows, seats per row, odd-row wall position, starting table ID
+- **Preview** the grid before saving
+- **Confirm & Save** upserts the `SeatLayouts` document — the displayHelp seat map picks it up immediately
+
+### 6. External Links
+- Links to Help-Tracking and Data Visualisation dashboards
 
 ## MongoDB Collections
 
@@ -52,8 +59,7 @@ Four tabs filter the schedule records:
 | `Tables` | Maps physical table IDs → room numbers |
 | `Schedule` | Lab session timetable (labID, room, start/end times) |
 | `Responses` | Student yes/no feedback per table per lab |
-| `Helps` | Help request start/end timestamps per table per lab |
-
+| `Helps` | Help request start/end timestamps per table per lab || `SeatLayouts` | Seat grid configuration per lab room (rows, seats, positions) |
 ## API Endpoints
 
 | Method | Path | Description |
@@ -62,6 +68,8 @@ Four tabs filter the schedule records:
 | `GET` | `/get-records?filter=<tab>` | Returns schedule records; filter: `ongoing`, `past`, `upcoming`, or `all` |
 | `GET` | `/get-room-numbers` | Returns distinct room numbers from the `Tables` collection |
 | `POST` | `/add-schedule` | Adds one or more schedule records; body: `{ records: [...] }` |
+| `GET` | `/get-seat-layout/:labNo` | Returns the seat layout for a room (`{ exists, layout }`) |
+| `POST` | `/save-seat-layout` | Upserts a `SeatLayouts` document; body: `{ labNo, totalRows, seatsPerRow, oddRowPosition, seats }` |
 
 ## Tech Stack
 

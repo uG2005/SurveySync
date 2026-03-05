@@ -27,11 +27,14 @@ Runs on **http://localhost:4000**.
 | `/lab/:labID` | List view — help calls shown as chips |
 | `/lab/:labID/map` | **Seat map view** — visual grid with pulsing seats |
 
-The home page links to the map view by default. The map view has a "List View" toggle in the header, and vice versa. If no `SeatLayouts` document exists for a lab, the map route falls back to the list view.
+The home page links to the map view by default. Both views have a toggle in the header to switch between **Map View** and **List View**. If no `SeatLayouts` document exists for a lab, the map route falls back to the list view.
 
 ## Seat Map Configuration
 
-Each lab room needs a `SeatLayouts` document in MongoDB. Use the helper script to generate and insert one:
+Layouts can be configured in two ways:
+
+1. **Admin panel** (recommended) — Use the **Seat Layout Manager** in the admin dashboard (`admin/` service) to visually preview and save layouts.
+2. **CLI script** — Use `insertSeatLayout.js` for batch/scripted setup.
 
 ```bash
 node insertSeatLayout.js <labNo> <totalRows> <seatsPerRow> [oddRowPosition] [startTableID]
@@ -90,4 +93,13 @@ The script prints an ASCII preview of the grid before inserting. Safe to re-run 
     ...
   ]
 }
+```
+
+## Related Services
+
+| Service | Port | Purpose |
+|---|---|---|
+| `admin/` | 3000 | Schedule management, seat layout configuration, WebSocket handler |
+| `graphs/` | 3010 | Data visualisation dashboard |
+| `helpArchive/` | 4000 | Historical help records |
 ```
