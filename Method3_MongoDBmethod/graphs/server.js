@@ -16,17 +16,14 @@ app.use((req, res, next) => {
     next();
 });
 
-const client = new MongoClient(uri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-});
+const client = new MongoClient(uri);
 
 async function connectDB() {
     try {
         await client.connect();
         db = client.db(dbName);
-        app.listen(3000, () => {
-            console.log('Server is running on http://localhost:3000');
+        app.listen(3010, () => {
+            console.log('Server is running on http://localhost:3010');
         });
     } catch (err) {
         console.error('Failed to connect to MongoDB:', err);
@@ -68,76 +65,49 @@ app.get('/', async (req, res) => {
     }
 });
 
+// Build a list of matching labIDs based on filter criteria (room, course, batch, lab)
+async function getMatchingLabIDs({ room, course, batch, lab }) {
+    // Build a regex filter on labID in the Schedule collection
+    const scheduleFilter = {};
+    if (room) scheduleFilter.labNo = room;
+
+    // Build regex for labID pattern: course-batch-lab
+    const labIDParts = [
+        course || '[^-]+',
+        batch || '[^-]+',
+        lab || '[^-]+'
+    ];
+    scheduleFilter.labID = { $regex: `^${labIDParts.join('-')}$` };
+
+    const schedules = await db.collection('Schedule').find(scheduleFilter, { projection: { labID: 1 } }).toArray();
+    return schedules.map(s => s.labID);
+}
+
 app.get('/data', async (req, res) => {
     try {
         const { room, course, batch, lab } = req.query;
 
-        // Initialize counters
-        let trues = 0;
-        let falses = 0;
-        let resolves = 0;
-        let unresolves = 0;
+        const matchingLabIDs = await getMatchingLabIDs({ room, course, batch, lab });
 
-        // Function to get room number from schedule
-        async function getRoomNumber(labID) {
-            const schedule = await db.collection('Schedule').findOne({ labID: labID });
-            return schedule ? schedule.labNo : null;
+        // If filters are set but no labIDs match, return zeros immediately
+        if ((room || course || batch || lab) && matchingLabIDs.length === 0) {
+            return res.json({ positiveResponses: 0, negativeResponses: 0, resolvedHelps: 0, unresolvedHelps: 0 });
         }
 
-        // Helper function to process data
-        async function processCursor(cursor, db) {
-            const docs = await cursor.toArray();
-            for (const doc of docs) {
-                const [docCourse, docBatch, docLab] = doc.labID.split('-');
-                const roomNumber = await getRoomNumber(doc.labID);
+        const labFilter = (room || course || batch || lab) ? { labID: { $in: matchingLabIDs } } : {};
 
-                const isCourseMatch = !course || docCourse === course;
-                const isBatchMatch = !batch || docBatch === batch;
-                const isLabMatch = !lab || docLab === lab;
-                const isRoomMatch = !room || roomNumber === room;
+        // Run all three collection queries in parallel
+        const [trues, falses, resolvedCount, unresolvedHelpsCount, unresolvedInHelpsCount] = await Promise.all([
+            db.collection('Responses').countDocuments({ ...labFilter, response: true }),
+            db.collection('Responses').countDocuments({ ...labFilter, response: false }),
+            db.collection('Helps').countDocuments({ ...labFilter, helpEnded: { $exists: true } }),
+            db.collection('UnresolvedHelps').countDocuments(labFilter),
+            db.collection('Helps').countDocuments({ ...labFilter, helpEnded: { $exists: false } })
+        ]);
 
-                if (isCourseMatch && isBatchMatch && isLabMatch && isRoomMatch) {
-                    if (db === 'Helps') {
-                        // Increment resolves if helpEnded exists
-                        if (doc.helpEnded) {
-                            resolves++;
-                        } else {
-                            unresolves++;
-                        }
-                    } else if (db === 'UnresolvedHelps') {
-                        // Increment unresolves for UnresolvedHelps
-                        unresolves++;
-                    } else { // db === 'Responses'
-                        // Increment true or false responses
-                        if (doc.response) {
-                            trues++;
-                        } else {
-                            falses++;
-                        }
-                    }
-                }
-            }
-        }
+        const resolves = resolvedCount;
+        const unresolves = unresolvedHelpsCount + unresolvedInHelpsCount;
 
-        // Clear previous values to avoid residual data
-        trues = 0;
-        falses = 0;
-        resolves = 0;
-        unresolves = 0;
-
-        // Process Responses
-        const responsesCursor = db.collection('Responses').find({});
-        await processCursor(responsesCursor, 'Responses');
-
-        // Process Helps
-        const helpsCursor = db.collection('Helps').find({});
-        await processCursor(helpsCursor, 'Helps');
-
-        // Process UnresolvedHelps
-        const unresolvedHelpsCursor = db.collection('UnresolvedHelps').find({});
-        await processCursor(unresolvedHelpsCursor, 'UnresolvedHelps');
-
-        // Send response
         console.log("Requests:", room, course, batch, lab);
         console.log("Response:", trues, falses, resolves, unresolves);
         res.json({
@@ -156,51 +126,47 @@ app.get('/download-data', async (req, res) => {
     try {
         const { room, course, batch, lab } = req.query;
 
-        let records = []; // Store actual records
+        const matchingLabIDs = await getMatchingLabIDs({ room, course, batch, lab });
 
-        async function getRoomNumber(labID) {
-            const schedule = await db.collection('Schedule').findOne({ labID: labID });
-            return schedule ? schedule.labNo : null;
+        if ((room || course || batch || lab) && matchingLabIDs.length === 0) {
+            return res.json([]);
         }
 
-        async function processCursor(cursor, dbName) {
-            const docs = await cursor.toArray();
-            for (const doc of docs) {
-                const [docCourse, docBatch, docLab] = doc.labID.split('-');
-                const roomNumber = await getRoomNumber(doc.labID);
+        const labFilter = (room || course || batch || lab) ? { labID: { $in: matchingLabIDs } } : {};
 
-                const isCourseMatch = !course || docCourse === course;
-                const isBatchMatch = !batch || docBatch === batch;
-                const isLabMatch = !lab || docLab === lab;
-                const isRoomMatch = !room || roomNumber === room;
-
-                if (isCourseMatch && isBatchMatch && isLabMatch && isRoomMatch) {
-                    records.push({
-                        db: dbName,
-                        room: roomNumber,
-                        course: docCourse,
-                        batch: docBatch,
-                        lab: docLab,
-                        response: doc.response || null,
-                        helpEnded: doc.helpEnded || null
-                    });
-                }
-            }
+        // Build a room lookup map from Schedule (one query instead of N)
+        const schedules = await db.collection('Schedule').find({}, { projection: { labID: 1, labNo: 1 } }).toArray();
+        const roomMap = {};
+        for (const s of schedules) {
+            roomMap[s.labID] = s.labNo;
         }
 
-        // Process Responses
-        const responsesCursor = db.collection('Responses').find({});
-        await processCursor(responsesCursor, 'Responses');
+        function mapDoc(doc, dbName) {
+            const [docCourse, docBatch, docLab] = doc.labID.split('-');
+            return {
+                db: dbName,
+                room: roomMap[doc.labID] || null,
+                course: docCourse,
+                batch: docBatch,
+                lab: docLab,
+                response: doc.response || null,
+                helpEnded: doc.helpEnded || null
+            };
+        }
 
-        // Process Helps
-        const helpsCursor = db.collection('Helps').find({});
-        await processCursor(helpsCursor, 'Helps');
+        // Fetch all three collections in parallel
+        const [responses, helps, unresolvedHelps] = await Promise.all([
+            db.collection('Responses').find(labFilter).toArray(),
+            db.collection('Helps').find(labFilter).toArray(),
+            db.collection('UnresolvedHelps').find(labFilter).toArray()
+        ]);
 
-        // Process UnresolvedHelps
-        const unresolvedHelpsCursor = db.collection('UnresolvedHelps').find({});
-        await processCursor(unresolvedHelpsCursor, 'UnresolvedHelps');
+        const records = [
+            ...responses.map(doc => mapDoc(doc, 'Responses')),
+            ...helps.map(doc => mapDoc(doc, 'Helps')),
+            ...unresolvedHelps.map(doc => mapDoc(doc, 'UnresolvedHelps'))
+        ];
 
-        // Send full records
         res.json(records);
     } catch (error) {
         console.error('Error fetching data for download:', error);
