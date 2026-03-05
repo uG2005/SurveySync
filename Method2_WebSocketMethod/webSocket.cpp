@@ -3,8 +3,8 @@
 #include <WebSocketsServer.h>
 #include "index.h"  // contains HTML, JavaScript and CSS
 int yes=0;int no=0;int help=5;
-const char* ssid = "Airtel_Sehgals Optic";     // CHANGE IT TO MATCH YOUR OWN NETWORK CREDENTIALS
-const char* password = "Shikha@1976";  // CHANGE IT TO MATCH YOUR OWN NETWORK CREDENTIALS
+const char* ssid = "Name_of_the_network";     // CHANGE IT TO MATCH YOUR OWN NETWORK CREDENTIALS
+const char* password = "password_of_the_network";  // CHANGE IT TO MATCH YOUR OWN NETWORK CREDENTIALS
 
 ESP8266WebServer server(80);                      // Web server on port 80
 WebSocketsServer plotter = WebSocketsServer(81);  // WebSocket server on port 81
