@@ -49,6 +49,61 @@ function updateIST(date) {
     return new Date(date.getTime() - istOffset * 60 * 1000);
 }
 
+/**
+ * Computes the CSS grid column layout for a lab's seating arrangement.
+ * Desk rows are paired (2 rows share a table), with aisles between pairs.
+ * @param {number} totalRows - Total number of desk rows (perpendicular to whiteboard)
+ * @param {string} oddRowPosition - 'left' or 'right': which wall the unpaired row touches
+ * @returns {{ columnMap: Object, gridTemplate: string, totalGridCols: number }}
+ */
+function computeGridLayout(totalRows, oddRowPosition) {
+    const groups = [];
+
+    if (totalRows % 2 === 1) {
+        if (oddRowPosition === 'left') {
+            // Odd row against left wall, then pairs going right
+            groups.push([0]);
+            for (let i = 1; i < totalRows; i += 2) {
+                groups.push([i, i + 1]);
+            }
+        } else {
+            // Pairs from left, odd row against right wall
+            for (let i = 0; i < totalRows - 1; i += 2) {
+                groups.push([i, i + 1]);
+            }
+            groups.push([totalRows - 1]);
+        }
+    } else {
+        // Even number of rows — all paired
+        for (let i = 0; i < totalRows; i += 2) {
+            groups.push([i, i + 1]);
+        }
+    }
+
+    let col = 1;
+    const columnMap = {};
+    const gridTemplateParts = [];
+
+    groups.forEach((group, gi) => {
+        group.forEach(r => {
+            columnMap[r] = col;
+            col++;
+            gridTemplateParts.push('minmax(60px, 1fr)');
+        });
+        // Add an aisle column between groups (but not after the last group)
+        if (gi < groups.length - 1) {
+            col++;
+            gridTemplateParts.push('24px');
+        }
+    });
+
+    return {
+        columnMap,
+        gridTemplate: gridTemplateParts.join(' '),
+        totalGridCols: col - 1
+    };
+}
+
 app.get('/', async (req, res) => {
 try {
     const currentTime = toIST(new Date());
@@ -131,6 +186,89 @@ app.get('/lab/:labID', async (req, res) => {
         res.render('lab', { labNumber, helps:helpsInIST, UnresolvedHelps: unresolvedHelpsInIST });
     } catch (error) {
         console.error("Error fetching data:", error);
+        res.status(500).send(error);
+    }
+});
+
+app.get('/lab/:labID/map', async (req, res) => {
+    const { labID } = req.params;
+    try {
+        // Look up the lab's room number
+        const lab = await db.collection('Schedule').findOne({ labID: labID });
+        const labNumber = lab ? lab.labNo : 'Unknown Lab';
+
+        // Fetch the seat layout for this room
+        const layout = await db.collection('SeatLayouts').findOne({ _id: labNumber });
+
+        if (!layout) {
+            // No layout configured — fall back to the list view
+            return res.redirect(`/lab/${labID}`);
+        }
+
+        // Fetch active helps (no helpEnded)
+        const helps = await db.collection('Helps').find({
+            labID: labID,
+            helpEnded: { $exists: false }
+        }).toArray();
+
+        // Fetch unresolved helps
+        const unresolvedHelps = await db.collection('UnresolvedHelps').find({
+            labID: labID
+        }).toArray();
+
+        // Build lookup maps by tableID
+        const helpMap = new Map(helps.map(h => [h.tableID, h]));
+        const unresolvedMap = new Map(unresolvedHelps.map(u => [u.tableID, u]));
+
+        // Compute CSS grid column positions from the pairing layout
+        const { columnMap, gridTemplate, totalGridCols } = computeGridLayout(
+            layout.totalRows,
+            layout.oddRowPosition || 'right'
+        );
+
+        // Merge seat positions with live help status
+        const processedSeats = layout.seats.map(seat => {
+            const tableID = seat.tableID;
+            let status = 'idle';
+            let helpData = null;
+
+            if (helpMap.has(tableID)) {
+                status = 'help';
+                helpData = helpMap.get(tableID);
+            } else if (unresolvedMap.has(tableID)) {
+                status = 'unresolved';
+                helpData = unresolvedMap.get(tableID);
+            }
+
+            const helpStarted = helpData?.helpStarted
+                ? new Date(helpData.helpStarted)
+                : null;
+
+            return {
+                tableID,
+                displayID: tableID % 1000,
+                status,
+                gridColumn: columnMap[seat.row],
+                gridRow: seat.seat + 1,  // 1-indexed for CSS grid
+                helpStarted: helpStarted ? helpStarted.toISOString() : null,
+                helpTime: helpStarted ? helpStarted.toLocaleTimeString() : null,
+                issue: helpData?.issue || null
+            };
+        }).sort((a, b) => a.gridRow - b.gridRow || a.gridColumn - b.gridColumn);
+
+        res.render('labMap', {
+            labNumber,
+            labID,
+            seats: processedSeats,
+            gridTemplateColumns: gridTemplate,
+            totalGridCols,
+            seatsPerRow: layout.seatsPerRow,
+            activeHelps: helps.length,
+            unresolvedCount: unresolvedHelps.length
+        });
+
+    } catch (error) {
+        console.error('Error fetching map data:', error);
         res.status(500).send(error);
     }
 });
