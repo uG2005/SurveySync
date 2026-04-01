@@ -355,7 +355,7 @@
                      <% } %>
                      title="Table <%= seat.tableID %><% if (seat.status === 'help') { %> — Needs Help<% } else if (seat.status === 'unresolved') { %> — <%= seat.issue %><% } %>"
                 >
-                    <span class="seat-number"><%= seat.displayID %></span>
+                    <span class="seat-number"><%= String(seat.tableID || seat.displayID).slice(-2) %></span>
                     <% if (seat.status === 'unresolved' && seat.issue) { %>
                         <span class="seat-sub"><%= seat.issue %></span>
                     <% } %>
