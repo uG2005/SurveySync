@@ -22,19 +22,21 @@
 
     async function getLabID(tableID) {
         try {
-            tableID = parseInt(tableID / 1000, 10);
-            if (isNaN(tableID)) {
+            // Extract room prefix from tableID (e.g., 3201 -> 32)
+            const roomPrefix = parseInt(tableID / 100, 10);
+            if (isNaN(roomPrefix)) {
                 throw new Error(`Invalid tableID: ${tableID}`);
             }
 
-            const table = await db.collection('Tables').findOne({ tableID: tableID });
+            // Find room that has this prefix in its tableID array
+            const table = await db.collection('Tables').findOne({ tableID: roomPrefix });
             if (!table) {
-                throw new Error(`No lab found for tableID: ${tableID}`);
+                throw new Error(`No lab found for table prefix: ${roomPrefix}`);
             }
 
             const labNo = table._id;
             if (!labNo) {
-                throw new Error(`Invalid labNo retrieved for tableID: ${tableID}`);
+                throw new Error(`Invalid labNo retrieved for table prefix: ${roomPrefix}`);
             }
 
             const currentTime = new Date();

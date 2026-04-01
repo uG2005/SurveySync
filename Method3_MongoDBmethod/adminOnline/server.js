@@ -73,12 +73,12 @@ async function connectToMongoDB() {
 
 async function getLabID(tableID) {
     try {
-        tableID = parseInt(tableID / 1000, 10);
-        if (isNaN(tableID)) {
+        const roomPrefix = parseInt(tableID / 100, 10);
+        if (isNaN(roomPrefix)) {
             throw new Error(`Invalid tableID: ${tableID}`);
         }
 
-        const table = await db.collection('Tables').findOne({ tableID: tableID });
+        const table = await db.collection('Tables').findOne({ tableID: roomPrefix });
         if (!table) {
             throw new Error(`No lab found for tableID: ${tableID}`);
         }

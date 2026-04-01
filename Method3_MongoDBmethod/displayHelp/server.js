@@ -246,7 +246,7 @@ app.get('/lab/:labID/map', async (req, res) => {
 
             return {
                 tableID,
-                displayID: tableID % 1000,
+                displayID: tableID % 100,  // Show last 2 digits of table ID
                 status,
                 gridColumn: columnMap[seat.row],
                 gridRow: seat.seat + 1,  // 1-indexed for CSS grid
@@ -275,12 +275,12 @@ app.get('/lab/:labID/map', async (req, res) => {
 
 async function getLabID(tableID) {
     try {
-        tableID = parseInt(tableID / 1000, 10);
-        if (isNaN(tableID)) {
+        const roomPrefix = parseInt(tableID / 100, 10);
+        if (isNaN(roomPrefix)) {
             throw new Error(`Invalid tableID: ${tableID}`);
         }
 
-        const table = await db.collection('Tables').findOne({ tableID: tableID });
+        const table = await db.collection('Tables').findOne({ tableID: roomPrefix });
         if (!table) {
             throw new Error(`No lab found for tableID: ${tableID}`);
         }
