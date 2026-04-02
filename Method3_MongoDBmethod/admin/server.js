@@ -78,37 +78,26 @@
 
     async function logHelpEnd(labID, tableID) {
         const helpLoggingCollection = db.collection('Helps');
-        const unresolvedCollection = db.collection('UnresolvedHelps');
         
         try {
-            // Check if this help was marked as unresolved
-            const isUnresolved = await unresolvedCollection.findOne({
-                labID: labID,
-                tableID: tableID
-            });
-            
-            if (isUnresolved) {
-                console.log('Help for table ' + tableID + ' is unresolved, ignoring end signal');
-                broadcastToClients('Help for table ' + tableID + ' is unresolved, ignoring end signal');
-                return;
-            }
-            
-            // Find the latest help record without helpEnded
+            // Find the latest help record that hasn't ended yet
             const latestRecord = await helpLoggingCollection.findOne(
                 { labID: labID, tableID: tableID, helpEnded: { $exists: false } },
                 { sort: { helpStarted: -1 } }
             );
             
             if (latestRecord) {
+                // Help exists and hasn't ended, so mark it as ended
                 await helpLoggingCollection.updateOne(
                     { _id: latestRecord._id },
                     { $set: { helpEnded: toIST(new Date()) } }
                 );
-                console.log('Updated document in Helps with helpEnded');
+                console.log('Updated document in Helps with helpEnded for table ' + tableID);
                 broadcastToClients('Help ended for table ' + tableID);
             } else {
-                console.log('No active help found for table ' + tableID);
-                broadcastToClients('No active help found for table ' + tableID);
+                // No active help found, ignore the end signal
+                console.log('No active help found for table ' + tableID + ', ignoring end signal');
+                broadcastToClients('No active help found for table ' + tableID + ', ignoring end signal');
             }
         } catch (error) {
             console.error("Error ending help for table " + tableID, error);
