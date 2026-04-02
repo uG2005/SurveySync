@@ -59,39 +59,60 @@
         }
     }
 
-    async function logToHelps(labID, tableID) {
+    async function logHelpStart(labID, tableID) {
         const helpLoggingCollection = db.collection('Helps');
-        const latestRecord = await helpLoggingCollection.findOne(
-            { labID: labID, tableID: tableID },
-            { sort: { helpStarted: -1 } }
-        );
+        const helpLoggingDoc = {
+            labID: labID,
+            tableID: tableID,
+            helpStarted: toIST(new Date())
+        };
+        try {
+            await helpLoggingCollection.insertOne(helpLoggingDoc);
+            console.log('Inserted new document into Helps (help started)');
+            broadcastToClients('Help started for table ' + tableID);
+        } catch (error) {
+            console.error("Error inserting document into Helps", error);
+            broadcastToClients("Error inserting document into Helps" + error);
+        }
+    }
 
-        if (!latestRecord || latestRecord.helpEnded) {
-            const helpLoggingDoc = {
+    async function logHelpEnd(labID, tableID) {
+        const helpLoggingCollection = db.collection('Helps');
+        const unresolvedCollection = db.collection('UnresolvedHelps');
+        
+        try {
+            // Check if this help was marked as unresolved
+            const isUnresolved = await unresolvedCollection.findOne({
                 labID: labID,
-                tableID: tableID,
-                helpStarted: toIST(new Date())
-            };
-            try {
-                await helpLoggingCollection.insertOne(helpLoggingDoc);
-                console.log('Inserted new document into Helps');
-                broadcastToClients('Inserted new document into Helps');
-            } catch (error) {
-                console.error("Error inserting document into Helps", error);
-                broadcastToClients("Error inserting document into Helps" + error);
+                tableID: tableID
+            });
+            
+            if (isUnresolved) {
+                console.log('Help for table ' + tableID + ' is unresolved, ignoring end signal');
+                broadcastToClients('Help for table ' + tableID + ' is unresolved, ignoring end signal');
+                return;
             }
-        } else {
-            try {
+            
+            // Find the latest help record without helpEnded
+            const latestRecord = await helpLoggingCollection.findOne(
+                { labID: labID, tableID: tableID, helpEnded: { $exists: false } },
+                { sort: { helpStarted: -1 } }
+            );
+            
+            if (latestRecord) {
                 await helpLoggingCollection.updateOne(
                     { _id: latestRecord._id },
                     { $set: { helpEnded: toIST(new Date()) } }
                 );
                 console.log('Updated document in Helps with helpEnded');
-                broadcastToClients('Updated document in Helps with helpEnded');
-            } catch (error) {
-                console.error("Error updating document in Helps", error);
-                broadcastToClients("Error updating document in Helps" + error);
+                broadcastToClients('Help ended for table ' + tableID);
+            } else {
+                console.log('No active help found for table ' + tableID);
+                broadcastToClients('No active help found for table ' + tableID);
             }
+        } catch (error) {
+            console.error("Error ending help for table " + tableID, error);
+            broadcastToClients("Error ending help for table " + tableID + ": " + error);
         }
     }
 
@@ -227,8 +248,13 @@
                 const labID = await getLabID(tableID);
         
                 if (value === 2) {
-                    await logToHelps(labID, tableID);
+                    // Signal 2: Help starts
+                    await logHelpStart(labID, tableID);
+                } else if (value === 3) {
+                    // Signal 3: Help ends
+                    await logHelpEnd(labID, tableID);
                 } else {
+                    // Other signals: Log responses
                     await logToResponses(labID, tableID, value);
                 }
         
