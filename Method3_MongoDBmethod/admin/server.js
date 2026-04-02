@@ -7,7 +7,7 @@
     require('dotenv').config({ path: "../.env" });
 
     const app = express();
-    const port = 3000; // Single port for both HTTP and WebSocket
+    const port = 4001; // Single port for both HTTP and WebSocket
 
     const uri = process.env.MONGODB_URI;
     let client;
@@ -124,8 +124,9 @@
                 { $set: responseLoggingDoc },
                 { upsert: true }
             );
-            console.log('Updated or inserted document into Responses');
-            broadcastToClients('Updated or inserted document into Responses');
+            const responseLabel = value === 1 ? 'Yes' : 'No';
+            console.log('Logged "' + responseLabel + '" successfully for table ' + tableID);
+            broadcastToClients('Logged "' + responseLabel + '" successfully for table ' + tableID);
         } catch (error) {
             console.error("Error updating or inserting document into Responses", error);
             broadcastToClients("Error updating or inserting document into Responses" + error);

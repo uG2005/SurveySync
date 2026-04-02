@@ -177,6 +177,24 @@
             const disconnectBtn = document.getElementById('disconnect-btn');
             const status = document.getElementById('status');
 
+            function getActivityClass(message) {
+                const normalized = String(message || '').toLowerCase();
+
+                if (normalized.includes('help')) {
+                    return 'activity-help';
+                }
+
+                if (normalized.includes('logged "yes"')) {
+                    return 'activity-yes';
+                }
+
+                if (normalized.includes('logged "no"')) {
+                    return 'activity-no';
+                }
+
+                return 'activity-neutral';
+            }
+
             connectBtn.onclick = function () {
                 if (!ws || ws.readyState === WebSocket.CLOSED) {
                     status.textContent = 'Connecting...';
@@ -195,7 +213,7 @@
                     ws.onmessage = function (event) {
                         const message = event.data;
                         const dataEntry = document.createElement('div');
-                        dataEntry.className = 'data-entry';
+                        dataEntry.className = 'data-entry activity-entry ' + getActivityClass(message);
                         dataEntry.textContent = message;
                         dataContainer.appendChild(dataEntry);
                     };

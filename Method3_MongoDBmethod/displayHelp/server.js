@@ -40,7 +40,7 @@ async function connectToMongoDB() {
 function toIST(date) {
     // Convert UTC date to IST (UTC+5:30)
     const istOffset = 5 * 60 + 30; // IST is UTC+5:30
-    return new Date(date.getTime() + istOffset * 60 * 1000);
+    return new Date(date.getTime() - istOffset * 60 * 1000);
 }
 
 function updateIST(date) {
@@ -172,8 +172,7 @@ app.get('/lab/:labID', async (req, res) => {
         // Convert helpStarted to IST for the specific lab
         const helpsInIST = helps.map(help => ({
             ...help,
-            // helpStarted: updateIST(new Date(help.helpStarted)) // Convert helpStarted to IST
-            helpStarted: new Date(help.helpStarted)
+            helpStarted: toIST(new Date(help.helpStarted))
         }));
 
         // Fetch the lab number
@@ -241,7 +240,7 @@ app.get('/lab/:labID/map', async (req, res) => {
             }
 
             const helpStarted = helpData?.helpStarted
-                ? new Date(helpData.helpStarted)
+                ? toIST(new Date(helpData.helpStarted))
                 : null;
 
             return {

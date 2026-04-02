@@ -143,14 +143,22 @@ app.get('/download-data', async (req, res) => {
 
         function mapDoc(doc, dbName) {
             const [docCourse, docBatch, docLab] = doc.labID.split('-');
+
+            const responseValue = doc.response === true
+                ? 'YES'
+                : doc.response === false
+                    ? 'NO'
+                    : 'HELP';
+
             return {
-                db: dbName,
-                room: roomMap[doc.labID] || null,
-                course: docCourse,
-                batch: docBatch,
-                lab: docLab,
-                response: doc.response || null,
-                helpEnded: doc.helpEnded || null
+                Source: dbName,
+                Room: roomMap[doc.labID] || null,
+                Course: docCourse,
+                Batch: docBatch,
+                Lab: docLab,
+                Response: responseValue,
+                HelpEnded: doc.helpEnded || null,
+                UnresolvedReason: dbName === 'UnresolvedHelps' ? (doc.issue || '') : ''
             };
         }
 

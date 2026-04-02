@@ -319,6 +319,35 @@ button:disabled {
     margin: 2px auto 0;
 }
 
+#activity-section .activity-entry {
+    border-radius: 10px;
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+#activity-section .activity-neutral {
+    background-color: #f8f9fa;
+    color: #333;
+}
+
+#activity-section .activity-help {
+    background-color: #fff3cd;
+    color: #7a5a00;
+    border: 1px solid #f1c40f;
+}
+
+#activity-section .activity-yes {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #7bd389;
+}
+
+#activity-section .activity-no {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5a3ad;
+}
+
 /* Footer */
 footer {
     width: 100%;
