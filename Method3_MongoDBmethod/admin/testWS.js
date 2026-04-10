@@ -10,10 +10,10 @@ ws.on('open', () => {
     // 2 -> help starts, 1 -> yes, 0 -> no, 3 -> help ends
     // Change table ID to one that maps to an active scheduled lab.
     const dataPoints = [
-        '3101\t2',
-        '3105\t1',
-        '3112\t0',
-        '3115\t3',
+        '3304\t2',
+        '3307\t2',
+        '3317\t2',
+        '3316\t2',
     ];
 
     dataPoints.forEach((data, index) => {
