@@ -43,6 +43,12 @@ function toIST(date) {
     return new Date(date.getTime() - istOffset * 60 * 1000);
 }
 
+function toIST2(date) {
+    // Convert UTC date to IST (UTC+5:30)
+    const istOffset = 5 * 60 + 30; // IST is UTC+5:30
+    return new Date(date.getTime() + istOffset * 60 * 1000);
+}
+
 function updateIST(date) {
     // Convert UTC date to IST (UTC+5:30)
     const istOffset = 5 * 60 + 30; // IST is UTC+5:30
@@ -106,7 +112,7 @@ function computeGridLayout(totalRows, oddRowPosition) {
 
 app.get('/', async (req, res) => {
 try {
-    const currentTime = toIST(new Date());
+    const currentTime = toIST2(new Date());
     console.log('Current date and time in IST:', currentTime.toISOString());
 
     // Get ongoing schedules
