@@ -7,7 +7,7 @@
     require('dotenv').config({ path: "../.env" });
 
     const app = express();
-    const port = 3000; // Single port for both HTTP and WebSocket
+    const port = 4001; // Single port for both HTTP and WebSocket
 
     const uri = process.env.MONGODB_URI;
     let client;
@@ -22,19 +22,21 @@
 
     async function getLabID(tableID) {
         try {
-            tableID = parseInt(tableID / 1000, 10);
-            if (isNaN(tableID)) {
+            // Extract room prefix from tableID (e.g., 3201 -> 32)
+            const roomPrefix = parseInt(tableID / 100, 10);
+            if (isNaN(roomPrefix)) {
                 throw new Error(`Invalid tableID: ${tableID}`);
             }
 
-            const table = await db.collection('Tables').findOne({ tableID: tableID });
+            // Find room that has this prefix in its tableID array
+            const table = await db.collection('Tables').findOne({ tableID: roomPrefix });
             if (!table) {
-                throw new Error(`No lab found for tableID: ${tableID}`);
+                throw new Error(`No lab found for table prefix: ${roomPrefix}`);
             }
 
             const labNo = table._id;
             if (!labNo) {
-                throw new Error(`Invalid labNo retrieved for tableID: ${tableID}`);
+                throw new Error(`Invalid labNo retrieved for table prefix: ${roomPrefix}`);
             }
 
             const currentTime = new Date();
@@ -57,39 +59,49 @@
         }
     }
 
-    async function logToHelps(labID, tableID) {
+    async function logHelpStart(labID, tableID) {
         const helpLoggingCollection = db.collection('Helps');
-        const latestRecord = await helpLoggingCollection.findOne(
-            { labID: labID, tableID: tableID },
-            { sort: { helpStarted: -1 } }
-        );
+        const helpLoggingDoc = {
+            labID: labID,
+            tableID: tableID,
+            helpStarted: toIST(new Date())
+        };
+        try {
+            await helpLoggingCollection.insertOne(helpLoggingDoc);
+            console.log('Inserted new document into Helps (help started)');
+            broadcastToClients('Help started for table ' + tableID);
+        } catch (error) {
+            console.error("Error inserting document into Helps", error);
+            broadcastToClients("Error inserting document into Helps" + error);
+        }
+    }
 
-        if (!latestRecord || latestRecord.helpEnded) {
-            const helpLoggingDoc = {
-                labID: labID,
-                tableID: tableID,
-                helpStarted: toIST(new Date())
-            };
-            try {
-                await helpLoggingCollection.insertOne(helpLoggingDoc);
-                console.log('Inserted new document into Helps');
-                broadcastToClients('Inserted new document into Helps');
-            } catch (error) {
-                console.error("Error inserting document into Helps", error);
-                broadcastToClients("Error inserting document into Helps" + error);
-            }
-        } else {
-            try {
+    async function logHelpEnd(labID, tableID) {
+        const helpLoggingCollection = db.collection('Helps');
+        
+        try {
+            // Find the latest help record that hasn't ended yet
+            const latestRecord = await helpLoggingCollection.findOne(
+                { labID: labID, tableID: tableID, helpEnded: { $exists: false } },
+                { sort: { helpStarted: -1 } }
+            );
+            
+            if (latestRecord) {
+                // Help exists and hasn't ended, so mark it as ended
                 await helpLoggingCollection.updateOne(
                     { _id: latestRecord._id },
                     { $set: { helpEnded: toIST(new Date()) } }
                 );
-                console.log('Updated document in Helps with helpEnded');
-                broadcastToClients('Updated document in Helps with helpEnded');
-            } catch (error) {
-                console.error("Error updating document in Helps", error);
-                broadcastToClients("Error updating document in Helps" + error);
+                console.log('Updated document in Helps with helpEnded for table ' + tableID);
+                broadcastToClients('Help ended for table ' + tableID);
+            } else {
+                // No active help found, ignore the end signal
+                console.log('No active help found for table ' + tableID + ', ignoring end signal');
+                broadcastToClients('No active help found for table ' + tableID + ', ignoring end signal');
             }
+        } catch (error) {
+            console.error("Error ending help for table " + tableID, error);
+            broadcastToClients("Error ending help for table " + tableID + ": " + error);
         }
     }
 
@@ -112,8 +124,9 @@
                 { $set: responseLoggingDoc },
                 { upsert: true }
             );
-            console.log('Updated or inserted document into Responses');
-            broadcastToClients('Updated or inserted document into Responses');
+            const responseLabel = value === 1 ? 'Yes' : 'No';
+            console.log('Logged "' + responseLabel + '" successfully for table ' + tableID);
+            broadcastToClients('Logged "' + responseLabel + '" successfully for table ' + tableID);
         } catch (error) {
             console.error("Error updating or inserting document into Responses", error);
             broadcastToClients("Error updating or inserting document into Responses" + error);
@@ -225,8 +238,13 @@
                 const labID = await getLabID(tableID);
         
                 if (value === 2) {
-                    await logToHelps(labID, tableID);
+                    // Signal 2: Help starts
+                    await logHelpStart(labID, tableID);
+                } else if (value === 3) {
+                    // Signal 3: Help ends
+                    await logHelpEnd(labID, tableID);
                 } else {
+                    // Other signals: Log responses
                     await logToResponses(labID, tableID, value);
                 }
         

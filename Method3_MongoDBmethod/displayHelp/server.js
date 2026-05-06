@@ -40,6 +40,12 @@ async function connectToMongoDB() {
 function toIST(date) {
     // Convert UTC date to IST (UTC+5:30)
     const istOffset = 5 * 60 + 30; // IST is UTC+5:30
+    return new Date(date.getTime() - istOffset * 60 * 1000);
+}
+
+function toIST2(date) {
+    // Convert UTC date to IST (UTC+5:30)
+    const istOffset = 5 * 60 + 30; // IST is UTC+5:30
     return new Date(date.getTime() + istOffset * 60 * 1000);
 }
 
@@ -106,7 +112,7 @@ function computeGridLayout(totalRows, oddRowPosition) {
 
 app.get('/', async (req, res) => {
 try {
-    const currentTime = toIST(new Date());
+    const currentTime = toIST2(new Date());
     console.log('Current date and time in IST:', currentTime.toISOString());
 
     // Get ongoing schedules
@@ -172,8 +178,7 @@ app.get('/lab/:labID', async (req, res) => {
         // Convert helpStarted to IST for the specific lab
         const helpsInIST = helps.map(help => ({
             ...help,
-            // helpStarted: updateIST(new Date(help.helpStarted)) // Convert helpStarted to IST
-            helpStarted: new Date(help.helpStarted)
+            helpStarted: toIST(new Date(help.helpStarted))
         }));
 
         // Fetch the lab number
@@ -241,12 +246,12 @@ app.get('/lab/:labID/map', async (req, res) => {
             }
 
             const helpStarted = helpData?.helpStarted
-                ? new Date(helpData.helpStarted)
+                ? toIST(new Date(helpData.helpStarted))
                 : null;
 
             return {
                 tableID,
-                displayID: tableID % 1000,
+                displayID: tableID % 100,  // Show last 2 digits of table ID
                 status,
                 gridColumn: columnMap[seat.row],
                 gridRow: seat.seat + 1,  // 1-indexed for CSS grid
@@ -275,12 +280,12 @@ app.get('/lab/:labID/map', async (req, res) => {
 
 async function getLabID(tableID) {
     try {
-        tableID = parseInt(tableID / 1000, 10);
-        if (isNaN(tableID)) {
+        const roomPrefix = parseInt(tableID / 100, 10);
+        if (isNaN(roomPrefix)) {
             throw new Error(`Invalid tableID: ${tableID}`);
         }
 
-        const table = await db.collection('Tables').findOne({ tableID: tableID });
+        const table = await db.collection('Tables').findOne({ tableID: roomPrefix });
         if (!table) {
             throw new Error(`No lab found for tableID: ${tableID}`);
         }

@@ -89,13 +89,13 @@
         .stat.help-stat {
             background: #fff3cd;
             color: #856404;
-            border: 1px solid #ffc107;
+            border: 1px solid #856404;
         }
 
         .stat.unresolved-stat {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+            background: #007bff8c;
+            color: #021c38;
+            border: 1px solid #1a252f;
         }
 
         /* ── Room container ── */
@@ -175,22 +175,44 @@
         .seat.help {
             background: #f7a009;
             color: #fff;
-            border: 2px solid #e6940a;
+            border: 2px solid #d4b007;
             cursor: pointer;
             animation: pulse 1.5s ease-in-out infinite;
-            box-shadow: 0 0 14px rgba(247, 160, 9, 0.45);
+            box-shadow: 0 0 14px rgba(247, 209, 10, 0.45);
+        }
+
+        .seat.help.help-medium {
+            background: #ff6f00;
+            border: 2px solid #e67700;
+            animation: pulse-medium 1s ease-in-out infinite;
+            box-shadow: 0 0 16px rgba(255, 140, 0, 0.55);
+        }
+
+        .seat.help.help-high {
+            background: #e53935;
+            border: 2px solid #c62828;
+            animation: pulse-fast 0.7s ease-in-out infinite;
+            box-shadow: 0 0 18px rgba(229, 57, 53, 0.6);
         }
 
         .seat.help:hover {
             transform: scale(1.1);
-            box-shadow: 0 0 28px rgba(247, 160, 9, 0.7);
+            box-shadow: 0 0 28px rgba(247, 209, 10, 0.7);
+        }
+
+        .seat.help.help-medium:hover {
+            box-shadow: 0 0 30px rgba(255, 140, 0, 0.8);
+        }
+
+        .seat.help.help-high:hover {
+            box-shadow: 0 0 32px rgba(229, 57, 53, 0.85);
         }
 
         .seat.unresolved {
-            background: #ff4d4d;
+            background: #2f80ed;
             color: #fff;
-            border: 2px solid #e03e3e;
-            box-shadow: 0 0 10px rgba(255, 77, 77, 0.3);
+            border: 2px solid #1f6fd8;
+            box-shadow: 0 0 10px rgba(47, 128, 237, 0.35);
         }
 
         @keyframes pulse {
@@ -203,7 +225,35 @@
 
             50% {
                 transform: scale(1.06);
-                box-shadow: 0 0 25px rgba(247, 160, 9, 0.7);
+                box-shadow: 0 0 25px rgba(247, 209, 10, 0.7);
+            }
+        }
+
+        @keyframes pulse-medium {
+
+            0%,
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 12px rgba(255, 140, 0, 0.45);
+            }
+
+            50% {
+                transform: scale(1.08);
+                box-shadow: 0 0 28px rgba(255, 140, 0, 0.8);
+            }
+        }
+
+        @keyframes pulse-fast {
+
+            0%,
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 14px rgba(229, 57, 53, 0.5);
+            }
+
+            50% {
+                transform: scale(1.1);
+                box-shadow: 0 0 30px rgba(229, 57, 53, 0.85);
             }
         }
 
@@ -240,8 +290,16 @@
             background: #f7a009;
         }
 
+        .legend-dot.help-medium {
+            background: #ff6f00;
+        }
+
+        .legend-dot.help-high {
+            background: #e53935;
+        }
+
         .legend-dot.unresolved {
-            background: #ff4d4d;
+            background: #2f80ed;
         }
 
         /* ── Issue classification overlay ── */
@@ -348,14 +406,23 @@
 
         <div class="seat-grid">
             <% seats.forEach(function(seat) { %>
-                <div class="seat <%= seat.status %>"
+                <% let urgencyClass = ''; %>
+                <% if (seat.status === 'help' && seat.helpStarted) { %>
+                    <% const elapsedMs = Date.now() - new Date(seat.helpStarted).getTime(); %>
+                    <% if (elapsedMs >= 20 * 60 * 1000) { %>
+                        <% urgencyClass = 'help-high'; %>
+                    <% } else if (elapsedMs >= 10 * 60 * 1000) { %>
+                        <% urgencyClass = 'help-medium'; %>
+                    <% } %>
+                <% } %>
+                <div class="seat <%= seat.status %> <%= urgencyClass %>"
                      style="grid-column: <%= seat.gridColumn %>; grid-row: <%= seat.gridRow %>;"
                      <% if (seat.status === 'help') { %>
                          onclick="openIssuePanel('<%= seat.tableID %>', '<%= seat.helpStarted %>')"
                      <% } %>
                      title="Table <%= seat.tableID %><% if (seat.status === 'help') { %> — Needs Help<% } else if (seat.status === 'unresolved') { %> — <%= seat.issue %><% } %>"
                 >
-                    <span class="seat-number"><%= seat.displayID %></span>
+                    <span class="seat-number"><%= String(seat.tableID || seat.displayID).slice(-2) %></span>
                     <% if (seat.status === 'unresolved' && seat.issue) { %>
                         <span class="seat-sub"><%= seat.issue %></span>
                     <% } %>
@@ -371,7 +438,13 @@
                 <div class="legend-dot idle"></div> Idle
             </div>
             <div class="legend-item">
-                <div class="legend-dot help"></div> Help Requested
+                <div class="legend-dot help"></div> Help (0-10 min)
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot help-medium"></div> Help (10-20 min)
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot help-high"></div> Help (20+ min)
             </div>
             <div class="legend-item">
                 <div class="legend-dot unresolved"></div> Unresolved Issue
@@ -442,7 +515,7 @@
         // Auto-refresh every 10 seconds
         setTimeout(function () {
             location.reload();
-        }, 10000);
+        }, 5000);
     </script>
 </body>
 

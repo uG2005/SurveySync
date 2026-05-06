@@ -42,14 +42,14 @@ async function connectToMongoDB() {
 
 async function getLabID(tableID) {
     try {
-        // Convert tableID and ensure it's an integer
-        tableID = parseInt(tableID / 1000, 10);
-        if (isNaN(tableID)) {
+        // Extract room prefix from tableID (e.g., 3201 -> 32)
+        const roomPrefix = parseInt(tableID / 100, 10);
+        if (isNaN(roomPrefix)) {
             throw new Error(`Invalid tableID: ${tableID}`);
         }
 
-        // Query Tables collection
-        const table = await db.collection('Tables').findOne({ tableID: tableID });
+        // Query Tables collection for room with this prefix
+        const table = await db.collection('Tables').findOne({ tableID: roomPrefix });
         if (!table) {
             throw new Error(`No lab found for tableID: ${tableID}`);
         }
